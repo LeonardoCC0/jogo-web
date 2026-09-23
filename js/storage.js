@@ -22,7 +22,9 @@
     FIRST_VISIT_DONE: 'cns_first_visit_done',
     TOTAL_SPINS: 'cns_total_spins',
     TOTAL_WINS: 'cns_total_wins',
-    TAMPER_ALERT: 'cns_tamper_flag'
+    TAMPER_ALERT: 'cns_tamper_flag',
+    AUTH_TOKEN: 'cns_auth_token',
+    USER_DATA: 'cns_user_data'
   };
 
   const sec = root.CNS_SECURITY;
@@ -232,6 +234,44 @@
         localStorage.removeItem(STORAGE_KEYS.TAMPER_ALERT);
       }
       return flag;
+    },
+
+    getAuthToken() {
+      return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN) || null;
+    },
+
+    setAuthToken(token) {
+      if (token) {
+        localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+      }
+    },
+
+    clearAuth() {
+      localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+      localStorage.removeItem(STORAGE_KEYS.USER_DATA);
+    },
+
+    getUserData() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.USER_DATA);
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) {
+        return null;
+      }
+    },
+
+    setUserData(user) {
+      if (user) {
+        localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
+        if (user.balance !== undefined) this.setBalance(user.balance);
+        if (user.displayName || user.username) this.setPlayerName(user.displayName || user.username);
+        if (user.avatar) this.setPlayerAvatar(user.avatar);
+        if (user.highestWin !== undefined) this.setHighestWin(user.highestWin);
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.USER_DATA);
+      }
     }
   };
 

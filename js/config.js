@@ -5,11 +5,10 @@
 
 const CONFIG = {
   GAME_NAME: 'CYBER NEON SLOTS',
-  VERSION: '1.0.0',
+  VERSION: '2.0.0',
   
-  // Moedas e Apostas Virtuais
+  // Moedas e Apostas Virtuais (Sem recarga artificial)
   INITIAL_BALANCE: 1000,
-  REFILL_AMOUNT: 1000,
   MIN_BET: 5,
   MAX_BET: 1000,
   DEFAULT_BET: 25,
@@ -20,9 +19,6 @@ const CONFIG = {
   REEL_DELAY_TURBO: [400, 750, 1100],
 
   // Símbolos do Jogo
-  // weight: probabilidade relativa no RNG (quanto maior, mais frequente)
-  // mult3: multiplicador para 3 símbolos idênticos
-  // mult2: multiplicador para 2 símbolos idênticos
   SYMBOLS: [
     {
       id: 'cherry',
@@ -104,18 +100,6 @@ const CONFIG = {
       color: '#ffd700',
       rarity: 'JACKPOT'
     }
-  ],
-
-  // Jogadores fictícios iniciais para o Ranking Global
-  INITIAL_LEADERBOARD: [
-    { name: 'Shadow', balance: 38450, highestWin: 5000, isCurrentPlayer: false, avatar: '🥷' },
-    { name: 'Ghost', balance: 27900, highestWin: 3750, isCurrentPlayer: false, avatar: '👻' },
-    { name: 'LuckyStrike', balance: 19400, highestWin: 2500, isCurrentPlayer: false, avatar: '🎲' },
-    { name: 'CyberAce', balance: 14850, highestWin: 2000, isCurrentPlayer: false, avatar: '🤖' },
-    { name: 'NeonValkyrie', balance: 10200, highestWin: 1500, isCurrentPlayer: false, avatar: '⚡' },
-    { name: 'QuantumGambler', balance: 7600, highestWin: 1250, isCurrentPlayer: false, avatar: '🔮' },
-    { name: 'PixelKing', balance: 5100, highestWin: 800, isCurrentPlayer: false, avatar: '👾' },
-    { name: 'RetroRacer', balance: 3200, highestWin: 500, isCurrentPlayer: false, avatar: '🏎️' }
   ]
 };
 

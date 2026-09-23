@@ -1,12 +1,11 @@
 /**
- * CYBER NEON SLOTS - Controlador Principal com Encapsulamento Fechado (Anti-Tampering)
- * O estado e variáveis de saldo rodam dentro de um escopo protegido privado sem exposição no console.
+ * CYBER NEON SLOTS - Controlador Principal
+ * Integrado com Autenticação, Persistência de Score no Servidor e Ranking 100% Real
  */
 
 (function() {
   'use strict';
 
-  // Congela as configurações para impedir modificação em tempo de execução via DevTools
   if (window.CONFIG) {
     Object.freeze(window.CONFIG);
     if (window.CONFIG.SYMBOLS) {
@@ -24,7 +23,6 @@
 
   class App {
     constructor() {
-      // Estado estritamente privado nesta instância da closure
       this.balance = storage.getBalance();
       this.currentBet = window.CONFIG.DEFAULT_BET;
       this.isTurbo = storage.getTurboEnabled();
@@ -33,10 +31,13 @@
       this.slotMachine = null;
       this.lastSpinTime = 0;
 
+      this.currentUser = null;
+      this.authToken = storage.getAuthToken();
+
       this.dom = {};
     }
 
-    init() {
+    async init() {
       this.cacheDOM();
       this.initParticles();
       this.initAudio();
@@ -47,15 +48,14 @@
       this.bindEvents();
       this.updateUI();
 
-      // Alerta caso alguma tentativa de alteração manual no LocalStorage tenha sido neutralizada
-      if (storage.hasTamperAlert && storage.hasTamperAlert()) {
-        setTimeout(() => {
-          this.showToast('🛡️ Integridade: Tentativa de alteração no saldo foi neutralizada.');
-        }, 1200);
-      }
+      // Expõe helper global para abrir modal de auth caso necessário
+      window.openAuthModal = (tab) => this.openAuthModal(tab);
 
-      // Primeiro acesso
-      if (storage.isFirstVisit()) {
+      // Verifica sessão do usuário logado
+      await this.checkAuthSession();
+
+      // Primeiro acesso sem login
+      if (storage.isFirstVisit() && !this.currentUser) {
         this.showWelcomeModal();
       }
     }
@@ -64,7 +64,8 @@
       this.dom = {
         // Topo
         balanceText: document.getElementById('user-balance'),
-        btnRefill: document.getElementById('btn-refill'),
+        btnOpenAuth: document.getElementById('btn-open-auth'),
+        btnLogout: document.getElementById('btn-logout'),
         btnSound: document.getElementById('btn-sound'),
         soundIcon: document.getElementById('sound-icon'),
         btnPaytable: document.getElementById('btn-paytable'),
@@ -104,15 +105,31 @@
 
         // Modais
         modalOverlay: document.getElementById('modal-overlay'),
+        authModal: document.getElementById('auth-modal'),
         welcomeModal: document.getElementById('welcome-modal'),
         paytableModal: document.getElementById('paytable-modal'),
         profileModal: document.getElementById('profile-modal'),
         jackpotModal: document.getElementById('jackpot-modal'),
         modalCloseBtns: document.querySelectorAll('.modal-close-btn'),
 
-        // Formulários
-        welcomeInput: document.getElementById('welcome-player-name'),
-        btnStartGame: document.getElementById('btn-start-game'),
+        // Auth Tabs & Forms
+        tabLoginBtn: document.getElementById('tab-login-btn'),
+        tabRegisterBtn: document.getElementById('tab-register-btn'),
+        loginForm: document.getElementById('login-form'),
+        registerForm: document.getElementById('register-form'),
+        loginUsernameInput: document.getElementById('login-username'),
+        loginPasswordInput: document.getElementById('login-password'),
+        registerUsernameInput: document.getElementById('register-username'),
+        registerPasswordInput: document.getElementById('register-password'),
+        registerAvatarSelect: document.getElementById('register-avatar'),
+        authErrorBox: document.getElementById('auth-error-box'),
+        authSuccessBox: document.getElementById('auth-success-box'),
+
+        // Welcome Modal Buttons
+        btnWelcomeRegister: document.getElementById('btn-welcome-register'),
+        btnWelcomeLogin: document.getElementById('btn-welcome-login'),
+
+        // Profile Modal
         profileInput: document.getElementById('profile-player-name'),
         profileAvatarSelect: document.getElementById('profile-avatar-select'),
         btnSaveProfile: document.getElementById('btn-save-profile'),
@@ -160,8 +177,243 @@
       rankingSystem.init(this.dom.leaderboardContainer);
     }
 
+    // =========================================================================
+    // AUTENTICAÇÃO E SESSÃO DO USUÁRIO
+    // =========================================================================
+
+    async checkAuthSession() {
+      if (!this.authToken) {
+        this.currentUser = null;
+        this.updateAuthUI();
+        rankingSystem.fetchAndUpdate(null);
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${this.authToken}`
+          }
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.user) {
+            this.currentUser = data.user;
+            this.balance = data.user.balance;
+            storage.setUserData(data.user);
+            this.updateAuthUI();
+            this.updateUI();
+            rankingSystem.fetchAndUpdate(this.currentUser);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('Erro ao validar sessão com o servidor:', e.message);
+      }
+
+      // Sessão inválida ou expirada
+      this.authToken = null;
+      this.currentUser = null;
+      storage.clearAuth();
+      this.updateAuthUI();
+      rankingSystem.fetchAndUpdate(null);
+    }
+
+    updateAuthUI() {
+      if (this.currentUser) {
+        if (this.dom.btnOpenAuth) this.dom.btnOpenAuth.classList.add('hidden');
+        if (this.dom.playerProfile) this.dom.playerProfile.classList.remove('hidden');
+        if (this.dom.btnLogout) this.dom.btnLogout.classList.remove('hidden');
+
+        if (this.dom.playerNameText) {
+          this.dom.playerNameText.textContent = this.currentUser.displayName || this.currentUser.username;
+        }
+        if (this.dom.playerAvatarIcon) {
+          this.dom.playerAvatarIcon.textContent = this.currentUser.avatar || '⚡';
+        }
+        if (this.dom.bestWinText) {
+          this.dom.bestWinText.textContent = (this.currentUser.highestWin || 0).toLocaleString('pt-BR');
+        }
+      } else {
+        if (this.dom.btnOpenAuth) this.dom.btnOpenAuth.classList.remove('hidden');
+        if (this.dom.playerProfile) this.dom.playerProfile.classList.add('hidden');
+        if (this.dom.btnLogout) this.dom.btnLogout.classList.add('hidden');
+      }
+    }
+
+    openAuthModal(mode = 'login') {
+      this.clearAuthMessages();
+      this.setAuthMode(mode);
+      this.openModal(this.dom.authModal);
+    }
+
+    setAuthMode(mode) {
+      this.clearAuthMessages();
+      const isLogin = mode === 'login';
+
+      if (this.dom.tabLoginBtn) this.dom.tabLoginBtn.classList.toggle('active', isLogin);
+      if (this.dom.tabRegisterBtn) this.dom.tabRegisterBtn.classList.toggle('active', !isLogin);
+      if (this.dom.loginForm) this.dom.loginForm.classList.toggle('active', isLogin);
+      if (this.dom.registerForm) this.dom.registerForm.classList.toggle('active', !isLogin);
+
+      if (isLogin && this.dom.loginUsernameInput) {
+        setTimeout(() => this.dom.loginUsernameInput.focus(), 100);
+      } else if (!isLogin && this.dom.registerUsernameInput) {
+        setTimeout(() => this.dom.registerUsernameInput.focus(), 100);
+      }
+    }
+
+    clearAuthMessages() {
+      if (this.dom.authErrorBox) {
+        this.dom.authErrorBox.textContent = '';
+        this.dom.authErrorBox.classList.add('hidden');
+      }
+      if (this.dom.authSuccessBox) {
+        this.dom.authSuccessBox.textContent = '';
+        this.dom.authSuccessBox.classList.add('hidden');
+      }
+    }
+
+    showAuthError(message) {
+      if (this.dom.authErrorBox) {
+        this.dom.authErrorBox.textContent = message;
+        this.dom.authErrorBox.classList.remove('hidden');
+      }
+      if (this.dom.authSuccessBox) {
+        this.dom.authSuccessBox.classList.add('hidden');
+      }
+    }
+
+    showAuthSuccess(message) {
+      if (this.dom.authSuccessBox) {
+        this.dom.authSuccessBox.textContent = message;
+        this.dom.authSuccessBox.classList.remove('hidden');
+      }
+      if (this.dom.authErrorBox) {
+        this.dom.authErrorBox.classList.add('hidden');
+      }
+    }
+
+    async handleLoginSubmit(e) {
+      e.preventDefault();
+      this.clearAuthMessages();
+
+      const username = (this.dom.loginUsernameInput.value || '').trim();
+      const password = this.dom.loginPasswordInput.value || '';
+
+      if (!username || !password) {
+        this.showAuthError('Preencha todos os campos.');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          this.showAuthError(data.error || 'Falha ao realizar login.');
+          return;
+        }
+
+        // Sucesso
+        this.authToken = data.token;
+        this.currentUser = data.user;
+        this.balance = data.user.balance;
+        storage.setAuthToken(data.token);
+        storage.setUserData(data.user);
+        storage.setFirstVisitDone();
+
+        this.closeAllModals();
+        this.updateAuthUI();
+        this.updateUI();
+        rankingSystem.fetchAndUpdate(this.currentUser);
+
+        this.showToast(`✅ Bem-vindo de volta, ${data.user.displayName || data.user.username}!`);
+      } catch (err) {
+        this.showAuthError('Erro de conexão ao tentar fazer login.');
+      }
+    }
+
+    async handleRegisterSubmit(e) {
+      e.preventDefault();
+      this.clearAuthMessages();
+
+      const username = (this.dom.registerUsernameInput.value || '').trim();
+      const password = this.dom.registerPasswordInput.value || '';
+      const avatar = this.dom.registerAvatarSelect ? this.dom.registerAvatarSelect.value : '⚡';
+
+      if (!username || username.length < 3) {
+        this.showAuthError('O nome de usuário deve ter pelo menos 3 caracteres.');
+        return;
+      }
+      if (!password || password.length < 4) {
+        this.showAuthError('A senha deve ter pelo menos 4 caracteres.');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password, avatar })
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          this.showAuthError(data.error || 'Falha ao registrar conta.');
+          return;
+        }
+
+        // Sucesso
+        this.authToken = data.token;
+        this.currentUser = data.user;
+        this.balance = data.user.balance;
+        storage.setAuthToken(data.token);
+        storage.setUserData(data.user);
+        storage.setFirstVisitDone();
+
+        this.closeAllModals();
+        this.updateAuthUI();
+        this.updateUI();
+        particleEngine.burst({ count: 70, type: 'win' });
+        rankingSystem.fetchAndUpdate(this.currentUser);
+
+        this.showToast(`🎉 Conta criada! +1.000 moedas virtuais adicionadas.`);
+      } catch (err) {
+        this.showAuthError('Erro de conexão ao tentar cadastrar.');
+      }
+    }
+
+    async handleLogout() {
+      if (this.authToken) {
+        try {
+          await fetch('/api/auth/logout', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${this.authToken}` }
+          });
+        } catch (e) {}
+      }
+
+      this.authToken = null;
+      this.currentUser = null;
+      storage.clearAuth();
+      this.stopAutoSpin();
+      this.updateAuthUI();
+      rankingSystem.fetchAndUpdate(null);
+      this.showToast('🚪 Você saiu da sua conta.');
+    }
+
+    // =========================================================================
+    // EVENTOS E INTERAÇÃO DO JOGO
+    // =========================================================================
+
     bindEvents() {
-      // Botão Girar com proteção anti-autoclicker
+      // Botão Girar
       this.dom.btnSpin.addEventListener('click', () => {
         audioSystem.playClick();
         this.triggerSpin();
@@ -175,11 +427,55 @@
         }
       });
 
-      // Recarga de Moedas de Demonstração
-      this.dom.btnRefill.addEventListener('click', () => {
-        audioSystem.playClick();
-        this.refillCoins();
-      });
+      // Abrir Modal de Autenticação no Cabeçalho
+      if (this.dom.btnOpenAuth) {
+        this.dom.btnOpenAuth.addEventListener('click', () => {
+          audioSystem.playClick();
+          this.openAuthModal('login');
+        });
+      }
+
+      // Logout
+      if (this.dom.btnLogout) {
+        this.dom.btnLogout.addEventListener('click', () => {
+          audioSystem.playClick();
+          if (confirm('Deseja realmente sair da sua conta?')) {
+            this.handleLogout();
+          }
+        });
+      }
+
+      // Alternar Abas no Modal de Auth
+      if (this.dom.tabLoginBtn) {
+        this.dom.tabLoginBtn.addEventListener('click', () => this.setAuthMode('login'));
+      }
+      if (this.dom.tabRegisterBtn) {
+        this.dom.tabRegisterBtn.addEventListener('click', () => this.setAuthMode('register'));
+      }
+
+      // Submit Login e Cadastro
+      if (this.dom.loginForm) {
+        this.dom.loginForm.addEventListener('submit', (e) => this.handleLoginSubmit(e));
+      }
+      if (this.dom.registerForm) {
+        this.dom.registerForm.addEventListener('submit', (e) => this.handleRegisterSubmit(e));
+      }
+
+      // Botões no Modal de Boas-Vindas
+      if (this.dom.btnWelcomeRegister) {
+        this.dom.btnWelcomeRegister.addEventListener('click', () => {
+          audioSystem.playClick();
+          this.closeAllModals();
+          this.openAuthModal('register');
+        });
+      }
+      if (this.dom.btnWelcomeLogin) {
+        this.dom.btnWelcomeLogin.addEventListener('click', () => {
+          audioSystem.playClick();
+          this.closeAllModals();
+          this.openAuthModal('login');
+        });
+      }
 
       // Alternar Som
       this.dom.btnSound.addEventListener('click', () => {
@@ -201,7 +497,7 @@
         });
       });
 
-      // Ajustes finos de aposta
+      // Ajustes de aposta
       this.dom.btnBetMinus.addEventListener('click', () => {
         audioSystem.playClick();
         this.setBet(this.currentBet - 5);
@@ -237,17 +533,13 @@
         this.toggleAutoSpin();
       });
 
-      // Modais
+      // Tabela de Prêmios
       this.dom.btnPaytable.addEventListener('click', () => {
         audioSystem.playClick();
         this.openModal(this.dom.paytableModal);
       });
 
-      this.dom.playerProfile.addEventListener('click', () => {
-        audioSystem.playClick();
-        this.openProfileModal();
-      });
-
+      // Fechamento de Modais
       this.dom.modalCloseBtns.forEach(btn => {
         btn.addEventListener('click', () => {
           audioSystem.playClick();
@@ -259,34 +551,6 @@
         if (e.target === this.dom.modalOverlay) {
           this.closeAllModals();
         }
-      });
-
-      // Boas-Vindas Iniciais com Sanitização
-      this.dom.btnStartGame.addEventListener('click', () => {
-        audioSystem.playClick();
-        const rawName = this.dom.welcomeInput.value;
-        const name = sec ? sec.sanitizeInput(rawName, 14) : rawName.trim().slice(0, 14);
-        storage.setPlayerName(name || 'CyberPlayer');
-        storage.setFirstVisitDone();
-        this.closeAllModals();
-        audioSystem.playRefill();
-        particleEngine.burst({ count: 60, type: 'win' });
-        this.updateUI();
-        this.showToast(`Bem-vindo, ${name || 'CyberPlayer'}! +1.000 moedas adicionadas!`);
-      });
-
-      // Salvar Perfil com Sanitização
-      this.dom.btnSaveProfile.addEventListener('click', () => {
-        audioSystem.playClick();
-        const rawName = this.dom.profileInput.value;
-        const name = sec ? sec.sanitizeInput(rawName, 14) : rawName.trim().slice(0, 14);
-        const avatar = sec ? sec.sanitizeInput(this.dom.profileAvatarSelect.value, 4) : this.dom.profileAvatarSelect.value;
-        storage.setPlayerName(name || storage.getPlayerName());
-        storage.setPlayerAvatar(avatar || storage.getPlayerAvatar());
-        this.closeAllModals();
-        this.updateUI();
-        rankingSystem.update();
-        this.showToast('Perfil atualizado com segurança!');
       });
 
       // Limpar Histórico
@@ -318,6 +582,11 @@
           document.querySelectorAll('.tab-content-panel').forEach(panel => {
             panel.classList.toggle('active', panel.id === targetTab);
           });
+
+          // Atualiza ranking real ao abrir aba do ranking
+          if (targetTab === 'tab-leaderboard') {
+            rankingSystem.fetchAndUpdate(this.currentUser);
+          }
         });
       });
     }
@@ -333,37 +602,86 @@
       });
     }
 
-    triggerSpin() {
+    // =========================================================================
+    // GIRO AUTORITATIVO NO SERVIDOR
+    // =========================================================================
+
+    async triggerSpin() {
       if (this.slotMachine.isSpinning) return;
 
-      // Rate limit anti-macro bot no cliente
+      // Rate limit anti-autoclicker
       const now = Date.now();
-      if (now - this.lastSpinTime < 280) {
-        return;
-      }
+      if (now - this.lastSpinTime < 280) return;
       this.lastSpinTime = now;
 
-      // Validação de saldo
+      // 1. Exige autenticação para girar
+      if (!this.currentUser || !this.authToken) {
+        this.stopAutoSpin();
+        this.showToast('🔒 Faça login ou crie sua conta para jogar e salvar seu score!');
+        this.openAuthModal('login');
+        return;
+      }
+
+      // 2. Validação de saldo (Sem recarga)
       if (this.balance < this.currentBet) {
         this.stopAutoSpin();
         this.showNoCoinsAlert();
         return;
       }
 
-      this.slotMachine.clearHighlights();
-      this.dom.winDisplay.classList.remove('show', 'jackpot-glow', 'win-pulse');
-      this.dom.slotMachineWrapper.classList.remove('machine-winning');
+      this.dom.btnSpin.disabled = true;
+      this.dom.btnSpin.classList.add('spinning');
 
-      this.slotMachine.spin({
-        isTurbo: this.isTurbo,
-        betAmount: this.currentBet
-      });
+      try {
+        // Envia requisição de giro ao backend
+        const res = await fetch('/api/spin', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.authToken}`
+          },
+          body: JSON.stringify({ bet: this.currentBet })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          this.dom.btnSpin.disabled = false;
+          this.dom.btnSpin.classList.remove('spinning');
+          this.stopAutoSpin();
+          this.showToast('⚠️ ' + (data.error || 'Erro ao processar rodada.'));
+          return;
+        }
+
+        const serverOutcome = data.outcome;
+
+        // Mapeia símbolos do servidor para a configuração local
+        const forcedSymbols = serverOutcome.symbols.map(serverSym => {
+          return window.CONFIG.SYMBOLS.find(cs => cs.id === serverSym.id) || serverSym;
+        });
+
+        this.slotMachine.clearHighlights();
+        this.dom.winDisplay.classList.remove('show', 'jackpot-glow', 'win-pulse');
+        this.dom.slotMachineWrapper.classList.remove('machine-winning');
+
+        // Dispara animação física dos rolos no frontend sincronizada com os símbolos do servidor
+        this.slotMachine.spin({
+          isTurbo: this.isTurbo,
+          betAmount: this.currentBet,
+          forcedSymbols,
+          serverOutcome
+        });
+
+      } catch (err) {
+        this.dom.btnSpin.disabled = false;
+        this.dom.btnSpin.classList.remove('spinning');
+        this.stopAutoSpin();
+        this.showToast('⚠️ Erro de comunicação com o servidor.');
+      }
     }
 
     handleSpinStart(betAmount) {
       this.animateBalanceChange(-betAmount);
-      this.dom.btnSpin.disabled = true;
-      this.dom.btnSpin.classList.add('spinning');
     }
 
     handleSpinComplete(outcome) {
@@ -372,14 +690,25 @@
 
       storage.recordSpin(outcome.isWin);
 
+      // Sincroniza saldo e recorde reais confirmados pelo servidor
+      if (outcome.newBalance !== undefined) {
+        this.balance = outcome.newBalance;
+        if (this.currentUser) {
+          this.currentUser.balance = outcome.newBalance;
+          if (outcome.highestWin !== undefined) {
+            this.currentUser.highestWin = outcome.highestWin;
+          }
+          storage.setUserData(this.currentUser);
+        }
+      }
+
       if (outcome.isWin && outcome.winAmount > 0) {
         this.slotMachine.highlightWin();
         this.dom.slotMachineWrapper.classList.add('machine-winning');
         this.animateBalanceChange(outcome.winAmount);
 
-        const isNewRecord = storage.setHighestWin(outcome.winAmount);
-        if (isNewRecord) {
-          this.dom.bestWinText.textContent = outcome.winAmount.toLocaleString('pt-BR');
+        if (outcome.highestWin) {
+          this.dom.bestWinText.textContent = outcome.highestWin.toLocaleString('pt-BR');
         }
 
         if (outcome.type === 'jackpot') {
@@ -396,7 +725,7 @@
       // Registra no histórico
       const historyEntry = {
         isWin: outcome.isWin,
-        amount: outcome.isWin ? outcome.winAmount : -outcome.betAmount,
+        amount: outcome.isWin ? outcome.winAmount : -this.currentBet,
         multiplier: outcome.multiplier,
         icons: outcome.symbols.map(s => s.icon).join(' '),
         timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -404,8 +733,8 @@
       storage.addHistoryEntry(historyEntry);
       this.renderHistory();
 
-      // Atualiza Ranking Global
-      rankingSystem.update();
+      // Atualiza Ranking Global Real
+      rankingSystem.fetchAndUpdate(this.currentUser);
 
       if (this.isAutoSpin) {
         const waitTime = outcome.isWin ? (outcome.type === 'jackpot' ? 4500 : 2000) : (this.isTurbo ? 350 : 800);
@@ -452,7 +781,6 @@
       const startVal = this.balance;
       const endVal = Math.max(0, startVal + diff);
       this.balance = endVal;
-      storage.setBalance(endVal);
 
       const duration = 600;
       const startTime = performance.now();
@@ -476,21 +804,10 @@
       requestAnimationFrame(step);
     }
 
-    refillCoins() {
-      const refill = window.CONFIG.REFILL_AMOUNT;
-      audioSystem.playRefill();
-      particleEngine.burst({ count: 45, type: 'win' });
-      this.animateBalanceChange(refill);
-      rankingSystem.update();
-      this.showToast(`+${refill.toLocaleString('pt-BR')} moedas virtuais adicionadas!`);
-    }
-
+    // Saldo insuficiente (Sem opção de recarga artificial)
     showNoCoinsAlert() {
       audioSystem.playClick();
-      const shouldRefill = confirm('Saldo insuficiente para esta aposta! Deseja recarregar +1.000 moedas virtuais de demonstração agora?');
-      if (shouldRefill) {
-        this.refillCoins();
-      }
+      this.showToast(`⚠️ Saldo insuficiente! Você possui apenas ${this.balance.toLocaleString('pt-BR')} moedas.`, 4000);
     }
 
     toggleAutoSpin() {
@@ -578,9 +895,6 @@
 
     updateUI() {
       this.dom.balanceText.textContent = this.balance.toLocaleString('pt-BR');
-      this.dom.playerNameText.textContent = storage.getPlayerName();
-      this.dom.playerAvatarIcon.textContent = storage.getPlayerAvatar();
-      this.dom.bestWinText.textContent = storage.getHighestWin().toLocaleString('pt-BR');
       this.setBet(this.currentBet);
     }
 
@@ -607,14 +921,7 @@
     }
 
     showWelcomeModal() {
-      this.dom.welcomeInput.value = storage.getPlayerName();
       this.openModal(this.dom.welcomeModal);
-    }
-
-    openProfileModal() {
-      this.dom.profileInput.value = storage.getPlayerName();
-      this.dom.profileAvatarSelect.value = storage.getPlayerAvatar();
-      this.openModal(this.dom.profileModal);
     }
 
     showToast(message, duration = 3000) {
@@ -628,11 +935,9 @@
     }
   }
 
-  // Inicializa a aplicação dentro de escopo estritamente isolado (sem expor para o window)
   document.addEventListener('DOMContentLoaded', () => {
     const app = new App();
     app.init();
-    // Intencionalmente NÃO expomos `window.cyberSlots = app` para impedir manipulação via console
   });
 
 })();

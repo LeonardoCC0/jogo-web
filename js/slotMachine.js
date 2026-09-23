@@ -83,13 +83,13 @@
       strip.style.transform = `translateY(0px)`;
     }
 
-    // Executa o giro com registro de auditoria no Ledger
-    spin({ isTurbo = false, betAmount = 25 }) {
+    // Executa o giro sincronizado com o servidor (ou local)
+    spin({ isTurbo = false, betAmount = 25, forcedSymbols = null, serverOutcome = null }) {
       if (this.isSpinning) return false;
 
-      // 1. Registra no Ledger de Segurança anti-fraude
+      // 1. Registra no Ledger de Segurança anti-fraude se local
       try {
-        if (root.CNS_SECURITY && root.CNS_SECURITY.ledger) {
+        if (!serverOutcome && root.CNS_SECURITY && root.CNS_SECURITY.ledger) {
           this.currentProofNonce = root.CNS_SECURITY.ledger.registerSpinStart(betAmount);
         }
       } catch (err) {
@@ -100,8 +100,8 @@
       this.isSpinning = true;
       this.updateItemHeight();
 
-      // 2. Sorteia o resultado final de cada rolo via RNG
-      const finalSymbols = [
+      // 2. Utiliza os símbolos sorteados pelo servidor se fornecidos
+      const finalSymbols = forcedSymbols || [
         this.getRandomSymbol(),
         this.getRandomSymbol(),
         this.getRandomSymbol()
@@ -135,20 +135,22 @@
         this.isSpinning = false;
         this.currentResults = finalSymbols;
 
-        // Avalia o resultado
-        const outcome = this.evaluateWin(finalSymbols, betAmount);
+        // Se veio do servidor, usa o resultado autoritativo
+        const outcome = serverOutcome || this.evaluateWin(finalSymbols, betAmount);
 
-        // 5. Validação da transação no Ledger de Segurança
-        try {
-          if (root.CNS_SECURITY && root.CNS_SECURITY.ledger && this.currentProofNonce) {
-            root.CNS_SECURITY.ledger.validateSpinWin(this.currentProofNonce, outcome);
+        // 5. Validação da transação no Ledger se foi local
+        if (!serverOutcome) {
+          try {
+            if (root.CNS_SECURITY && root.CNS_SECURITY.ledger && this.currentProofNonce) {
+              root.CNS_SECURITY.ledger.validateSpinWin(this.currentProofNonce, outcome);
+            }
+          } catch (secErr) {
+            console.error('🚨 Alerta Crítico de Fraude:', secErr.message);
+            outcome.isWin = false;
+            outcome.winAmount = 0;
+            outcome.type = 'loss';
+            outcome.message = 'Transação rejeitada pelo sistema de segurança.';
           }
-        } catch (secErr) {
-          console.error('🚨 Alerta Crítico de Fraude:', secErr.message);
-          outcome.isWin = false;
-          outcome.winAmount = 0;
-          outcome.type = 'loss';
-          outcome.message = 'Transação rejeitada pelo sistema de segurança.';
         }
 
         this.onSpinComplete(outcome);

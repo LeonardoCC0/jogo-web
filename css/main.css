@@ -254,28 +254,43 @@ body {
   font-weight: 600;
 }
 
-.btn-refill {
+.hidden {
+  display: none !important;
+}
+
+.btn-auth-header {
   background: linear-gradient(135deg, #00f0ff, #0099ff);
   color: #040814;
   border: none;
   font-family: var(--font-heading);
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   font-weight: 700;
-  padding: 8px 12px;
-  border-radius: var(--radius-md);
+  padding: 8px 16px;
+  border-radius: var(--radius-xl);
   cursor: pointer;
   letter-spacing: 0.5px;
-  box-shadow: 0 0 12px var(--neon-cyan-glow);
+  box-shadow: 0 0 14px var(--neon-cyan-glow);
   transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.btn-refill:hover {
-  transform: translateY(-1px) scale(1.04);
-  box-shadow: 0 0 18px rgba(0, 240, 255, 0.6);
+.btn-auth-header:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 0 22px rgba(0, 240, 255, 0.7);
 }
 
-.btn-refill:active {
-  transform: translateY(1px);
+.btn-logout {
+  background: rgba(255, 51, 102, 0.12);
+  border: 1px solid rgba(255, 51, 102, 0.35);
+  color: #ff3366;
+}
+
+.btn-logout:hover {
+  background: rgba(255, 51, 102, 0.25);
+  border-color: #ff3366;
+  box-shadow: 0 0 12px rgba(255, 51, 102, 0.4);
 }
 
 /* Topo Direita: Perfil e Botões */

@@ -1,17 +1,19 @@
 {
   "name": "cyber-neon-slots",
-  "version": "1.0.0",
-  "description": "Jogo web moderno de caça-níqueis virtual de tela única",
+  "version": "2.0.0",
+  "description": "Jogo web moderno de caça-níqueis virtual de tela única com login, score persistente e ranking real",
   "main": "index.html",
   "scripts": {
-    "start": "npx serve ."
+    "start": "node server/server.js",
+    "test": "node server/test_api.js"
   },
   "keywords": [
     "slot-machine",
     "web-game",
     "html5",
     "cyberpunk",
-    "neon"
+    "neon",
+    "vercel"
   ],
   "author": "",
   "license": "MIT"

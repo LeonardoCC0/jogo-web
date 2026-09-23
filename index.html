@@ -35,7 +35,7 @@
     </div>
 
     <div class="header-center">
-      <!-- Cartão de Saldo do Jogador -->
+      <!-- Cartão de Saldo do Jogador (Sem Recarga) -->
       <div class="balance-card">
         <div class="balance-icon-wrap">
           <span class="coin-gem">🪙</span>
@@ -47,22 +47,28 @@
             <span class="balance-unit">moedas</span>
           </div>
         </div>
-        <button id="btn-refill" class="btn-refill" title="Adicionar +1.000 moedas virtuais de demonstração">
-          <span>+ Recarga</span>
-        </button>
       </div>
     </div>
 
     <div class="header-right">
-      <!-- Card do Perfil do Jogador -->
-      <div id="player-profile" class="player-profile-chip" title="Clique para editar seu apelido e avatar">
+      <!-- Botão para Entrar/Cadastrar quando deslogado -->
+      <button id="btn-open-auth" class="btn-auth-header" title="Entrar ou criar conta para salvar pontuação">
+        <span>🔑 Entrar / Cadastrar</span>
+      </button>
+
+      <!-- Card do Perfil do Jogador (quando logado) -->
+      <div id="player-profile" class="player-profile-chip hidden" title="Jogador conectado">
         <div id="player-avatar-icon" class="profile-avatar">⚡</div>
         <div class="profile-meta">
           <span id="player-name-text" class="profile-name">CyberPlayer</span>
           <span class="profile-record">Recorde: <strong id="best-win-text">0</strong></span>
         </div>
-        <span class="profile-edit-hint">✏️</span>
       </div>
+
+      <!-- Botão de Sair (Logout) -->
+      <button id="btn-logout" class="btn-icon btn-logout hidden" title="Sair da Conta" aria-label="Sair">
+        <span>🚪</span>
+      </button>
 
       <!-- Botões de Ação do Topo -->
       <div class="header-actions">
@@ -250,30 +256,93 @@
   <!-- OVERLAY E MODAIS -->
   <div id="modal-overlay" class="modal-overlay">
 
+    <!-- Modal de Autenticação (Login / Cadastro) -->
+    <div id="auth-modal" class="modal-window auth-modal">
+      <div class="modal-header-row">
+        <h2 class="modal-title" id="auth-modal-title">ACESSO CYBER SLOTS</h2>
+        <button class="modal-close-btn" aria-label="Fechar">&times;</button>
+      </div>
+      
+      <div class="auth-tabs">
+        <button id="tab-login-btn" class="auth-tab active" data-auth-tab="login">Entrar</button>
+        <button id="tab-register-btn" class="auth-tab" data-auth-tab="register">Criar Conta</button>
+      </div>
+
+      <div id="auth-error-box" class="auth-alert-box error hidden"></div>
+      <div id="auth-success-box" class="auth-alert-box success hidden"></div>
+
+      <!-- Formulário de Login -->
+      <form id="login-form" class="auth-form active">
+        <div class="form-group">
+          <label for="login-username">Nome de Usuário:</label>
+          <input type="text" id="login-username" maxlength="16" placeholder="Seu apelido" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+          <label for="login-password">Senha:</label>
+          <input type="password" id="login-password" minlength="4" placeholder="Sua senha secreta" autocomplete="current-password" required>
+        </div>
+        <button type="submit" id="btn-submit-login" class="btn-modal-primary">ENTRAR NO JOGO</button>
+      </form>
+
+      <!-- Formulário de Cadastro -->
+      <form id="register-form" class="auth-form">
+        <div class="welcome-gift-card">
+          <div class="gift-icon">🎁</div>
+          <div class="gift-info">
+            <span class="gift-label">SALDO INICIAL ÚNICO:</span>
+            <strong class="gift-amount">+1.000 MOEDAS</strong>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="register-username">Nome de Usuário (Ranking):</label>
+          <input type="text" id="register-username" maxlength="16" placeholder="Ex: CyberMaster" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+          <label for="register-password">Senha (mínimo 4 caracteres):</label>
+          <input type="password" id="register-password" minlength="4" placeholder="Crie sua senha" autocomplete="new-password" required>
+        </div>
+        <div class="form-group">
+          <label for="register-avatar">Escolha seu Avatar Neon:</label>
+          <select id="register-avatar">
+            <option value="⚡">⚡ Raio Neon</option>
+            <option value="🥷">🥷 Ninja Cyber</option>
+            <option value="🤖">🤖 Androide</option>
+            <option value="👾">👾 Pixel Retro</option>
+            <option value="🔮">🔮 Orbe Mágico</option>
+            <option value="👑">👑 Realeza</option>
+            <option value="🎲">🎲 Dado da Sorte</option>
+            <option value="🚀">🚀 Foguete</option>
+          </select>
+        </div>
+        <div class="modal-disclaimer-box">
+          <p>⚠️ <strong>Regra do Jogo:</strong> Não é possível recarregar moedas. Jogue com precisão para salvar seu recorde e liderar o Ranking Global!</p>
+        </div>
+        <button type="submit" id="btn-submit-register" class="btn-modal-primary">CRIAR CONTA E JOGAR</button>
+      </form>
+    </div>
+
     <!-- Modal de Boas-Vindas (Primeiro Acesso) -->
     <div id="welcome-modal" class="modal-window welcome-modal">
       <div class="modal-decor-icon">🎰</div>
       <h2 class="modal-title">BEM-VINDO AO CYBER SLOTS!</h2>
-      <p class="modal-lead">Sua experiência futurista de caça-níqueis com adrenalina e moedas 100% virtuais.</p>
+      <p class="modal-lead">Sua experiência futurista de caça-níqueis com ranking 100% real e moedas virtuais.</p>
       
       <div class="welcome-gift-card">
         <div class="gift-icon">🎁</div>
         <div class="gift-info">
           <span class="gift-label">BÔNUS DE BOAS-VINDAS:</span>
-          <strong class="gift-amount">+1.000 MOEDAS VIRTUAIS</strong>
+          <strong class="gift-amount">+1.000 MOEDAS NO CADASTRO</strong>
         </div>
       </div>
 
-      <div class="form-group">
-        <label for="welcome-player-name">Escolha seu Apelido no Ranking:</label>
-        <input type="text" id="welcome-player-name" maxlength="14" placeholder="Ex: CyberMaster777" value="CyberPlayer">
-      </div>
-
       <div class="modal-disclaimer-box">
-        <p>⚠️ <strong>Aviso Importante:</strong> Este é um jogo de entretenimento casual. As moedas são virtuais, não possuem valor monetário, não podem ser trocadas por dinheiro real nem exigem pagamentos.</p>
+        <p>⚠️ <strong>Aviso Importante:</strong> Para que seu saldo e score fiquem gravados permanentemente e você apareça no Ranking Real, conecte-se à sua conta.</p>
       </div>
 
-      <button id="btn-start-game" class="btn-modal-primary">COMEÇAR A JOGAR</button>
+      <div class="welcome-buttons-row">
+        <button id="btn-welcome-register" class="btn-modal-primary">CRIAR CONTA GRÁTIS</button>
+        <button id="btn-welcome-login" class="btn-modal-secondary">JÁ POSSUO CONTA</button>
+      </div>
     </div>
 
     <!-- Modal da Tabela de Pagamentos e Regras -->
