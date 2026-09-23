@@ -1,5 +1,25 @@
 {
-  "users": {},
-  "sessions": {},
+  "users": {
+    "coxstaa": {
+      "id": "u_88ed6754",
+      "username": "coxstaa",
+      "displayName": "coxstaa",
+      "passwordHash": "7bb6c366f7025e42b99b093acdda8eb6a56c23e57d59086cccc2d59672d70f56f0c6d5f316be010c46e3019b5ca52be2176a2e67f7b1e4f65291bdb8609069cf",
+      "salt": "5b8891979bb12b816ceac9cbef23c02c",
+      "avatar": "🥷",
+      "balance": 775,
+      "highestWin": 25,
+      "score": 775,
+      "createdAt": 1790166621057,
+      "updatedAt": 1790166652838
+    }
+  },
+  "sessions": {
+    "562fe895152b654df24e8816dbcc1c2ead349c3a879bff3817a6d19ed25dcc74": {
+      "userId": "u_88ed6754",
+      "username": "coxstaa",
+      "createdAt": 1790166621058
+    }
+  },
   "history": []
 }
