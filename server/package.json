@@ -1,0 +1,11 @@
+{
+  "name": "cyber-slots-server",
+  "version": "1.0.0",
+  "description": "Servidor Backend Autoritativo e Seguro para Cyber Neon Slots",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {},
+  "private": true
+}

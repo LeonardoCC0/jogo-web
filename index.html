@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>CYBER NEON SLOTS - Jogo Caça-Níquel Virtual</title>
+  <meta name="description" content="Jogo de caça-níqueis virtual moderno em tela única com ranking global, efeitos neon, física suave e moedas 100% virtuais sem valor monetário.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/machine.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+
+  <!-- Canvas para Chuva de Confetes e Partículas de Vitória -->
+  <canvas id="particle-canvas"></canvas>
+
+  <!-- Topo / Barra Superior -->
+  <header class="game-header">
+    <div class="header-left">
+      <div class="logo-wrapper">
+        <span class="logo-icon">🎰</span>
+        <div class="logo-text-group">
+          <h1 class="game-logo">CYBER<span>SLOTS</span></h1>
+          <span class="logo-sub">NEON ARCADE • 100% VIRTUAL</span>
+        </div>
+      </div>
+      <div class="disclaimer-badge" title="Este jogo utiliza apenas pontos virtuais sem valor monetário real">
+        <span class="badge-dot"></span>
+        <span>Apenas Moedas Virtuais • Sem Dinheiro Real</span>
+      </div>
+    </div>
+
+    <div class="header-center">
+      <!-- Cartão de Saldo do Jogador -->
+      <div class="balance-card">
+        <div class="balance-icon-wrap">
+          <span class="coin-gem">🪙</span>
+        </div>
+        <div class="balance-info">
+          <span class="balance-label">SALDO VIRTUAL</span>
+          <div class="balance-num-row">
+            <span id="user-balance" class="balance-num">1.000</span>
+            <span class="balance-unit">moedas</span>
+          </div>
+        </div>
+        <button id="btn-refill" class="btn-refill" title="Adicionar +1.000 moedas virtuais de demonstração">
+          <span>+ Recarga</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <!-- Card do Perfil do Jogador -->
+      <div id="player-profile" class="player-profile-chip" title="Clique para editar seu apelido e avatar">
+        <div id="player-avatar-icon" class="profile-avatar">⚡</div>
+        <div class="profile-meta">
+          <span id="player-name-text" class="profile-name">CyberPlayer</span>
+          <span class="profile-record">Recorde: <strong id="best-win-text">0</strong></span>
+        </div>
+        <span class="profile-edit-hint">✏️</span>
+      </div>
+
+      <!-- Botões de Ação do Topo -->
+      <div class="header-actions">
+        <button id="btn-sound" class="btn-icon" title="Ativar/Desativar Som" aria-label="Som">
+          <span id="sound-icon">🔊</span>
+        </button>
+        <button id="btn-paytable" class="btn-icon" title="Tabela de Prêmios e Regras" aria-label="Tabela de Prêmios">
+          <span>ℹ️</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Abas para telas móveis (Smartphones e Tablets pequenos) -->
+  <nav class="mobile-tabs-nav">
+    <button class="mobile-tab-btn active" data-tab="tab-machine">
+      <span>🎰</span> Máquina
+    </button>
+    <button class="mobile-tab-btn" data-tab="tab-leaderboard">
+      <span>🏆</span> Ranking
+    </button>
+    <button class="mobile-tab-btn" data-tab="tab-history">
+      <span>📜</span> Histórico
+    </button>
+  </nav>
+
+  <!-- Container Principal do Jogo (3 Colunas no Desktop) -->
+  <main class="game-container">
+    
+    <!-- Coluna Esquerda: Ranking Global de Jogadores -->
+    <aside id="tab-leaderboard" class="sidebar-panel sidebar-left tab-content-panel">
+      <div class="panel-card" id="leaderboard-container">
+        <!-- Renderizado dinamicamente via js/ranking.js -->
+      </div>
+    </aside>
+
+    <!-- Coluna Central: Máquina Caça-Níquel & Console de Apostas -->
+    <section id="tab-machine" class="center-stage tab-content-panel active">
+      <div id="slot-machine-wrapper" class="slot-machine-wrapper">
+        
+        <!-- Topo da Máquina (Marquee com LEDs) -->
+        <div class="machine-header">
+          <div class="led-strip led-left"></div>
+          <div class="machine-title-badge">
+            <span class="title-sparkle">✦</span>
+            <span>CYBER JACKPOT</span>
+            <span class="title-sparkle">✦</span>
+          </div>
+          <div class="led-strip led-right"></div>
+        </div>
+
+        <!-- Janela dos Rolos da Máquina (Reels Window) -->
+        <div class="reels-window-frame">
+          <div class="payline-laser" title="Linha de Pagamento Central">
+            <div class="laser-beam"></div>
+            <div class="laser-tag left">PAYLINE</div>
+            <div class="laser-tag right">PAYLINE</div>
+          </div>
+
+          <!-- Gradientes de curvatura 3D (sombra e brilho de cilindro) -->
+          <div class="cylinder-shadow-top"></div>
+          <div class="cylinder-shadow-bottom"></div>
+
+          <!-- Grade dos 3 Rolos -->
+          <div class="reels-grid">
+            <div id="reel-1" class="slot-reel" data-index="0">
+              <div class="reel-strip">
+                <!-- Preenchido via slotMachine.js -->
+              </div>
+            </div>
+            <div class="reel-divider"></div>
+            <div id="reel-2" class="slot-reel" data-index="1">
+              <div class="reel-strip">
+                <!-- Preenchido via slotMachine.js -->
+              </div>
+            </div>
+            <div class="reel-divider"></div>
+            <div id="reel-3" class="slot-reel" data-index="2">
+              <div class="reel-strip">
+                <!-- Preenchido via slotMachine.js -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Banner de Notificação de Vitória (aparece quando ganha) -->
+        <div id="win-display" class="win-display">
+          <div class="win-glow-backdrop"></div>
+          <div class="win-content">
+            <div class="win-title-row">
+              <span class="win-sparkle">✨</span>
+              <span id="win-amount-text" class="win-amount">+500 moedas</span>
+              <span class="win-sparkle">✨</span>
+            </div>
+            <div id="win-multiplier-text" class="win-multiplier">10x • VITÓRIA!</div>
+          </div>
+        </div>
+
+        <!-- Painel de Controle de Apostas & Ações -->
+        <div class="machine-control-deck">
+          
+          <!-- Seletor de Valor de Aposta -->
+          <div class="bet-control-group">
+            <div class="bet-label-row">
+              <span class="control-label">VALOR DA APOSTA VIRTUAL</span>
+              <span class="control-hint">Mín: 5 • Máx: 1.000</span>
+            </div>
+            
+            <div class="bet-input-box">
+              <button id="btn-bet-minus" class="btn-bet-step" title="Diminuir aposta em 5" aria-label="Diminuir aposta">-</button>
+              <div class="bet-value-display">
+                <span class="bet-currency-icon">🪙</span>
+                <span id="bet-display" class="bet-amount">25</span>
+              </div>
+              <button id="btn-bet-plus" class="btn-bet-step" title="Aumentar aposta em 5" aria-label="Aumentar aposta">+</button>
+              <button id="btn-max-bet" class="btn-max" title="Apostar valor máximo permitido">MÁX</button>
+            </div>
+
+            <!-- Fichas Rápidas de Aposta -->
+            <div class="quick-chips-row">
+              <button class="chip-btn" data-bet="10">10</button>
+              <button class="chip-btn chip-active" data-bet="25">25</button>
+              <button class="chip-btn" data-bet="50">50</button>
+              <button class="chip-btn" data-bet="100">100</button>
+              <button class="chip-btn" data-bet="250">250</button>
+              <button class="chip-btn" data-bet="500">500</button>
+            </div>
+          </div>
+
+          <!-- Botões de Ação Principais -->
+          <div class="action-buttons-group">
+            
+            <div class="modifier-buttons">
+              <button id="btn-turbo" class="btn-modifier" title="Giro rápido e instantâneo">
+                <span class="mod-icon">⚡</span>
+                <span class="mod-text">TURBO</span>
+              </button>
+              <button id="btn-auto-spin" class="btn-modifier" title="Giro automático contínuo">
+                <span class="mod-icon">🔄</span>
+                <span class="mod-text">AUTO</span>
+              </button>
+            </div>
+
+            <!-- O Grande Botão GIRAR -->
+            <button id="btn-spin" class="btn-spin" title="Clique ou pressione ESPAÇO para girar">
+              <div class="spin-btn-glow"></div>
+              <div class="spin-btn-inner">
+                <span class="spin-main-text">GIRAR</span>
+                <span class="spin-sub-text">ESPAÇO</span>
+              </div>
+            </button>
+
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Coluna Direita: Histórico de Rodadas Recentes & Estatísticas -->
+    <aside id="tab-history" class="sidebar-panel sidebar-right tab-content-panel">
+      <div class="panel-card history-panel-card">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span class="panel-icon">📜</span>
+            <h3>Últimas Rodadas</h3>
+          </div>
+          <button id="btn-clear-history" class="btn-subtle" title="Limpar histórico recente">Limpar</button>
+        </div>
+        
+        <div id="history-list" class="history-list-box">
+          <!-- Preenchido dinamicamente via js/app.js -->
+        </div>
+
+        <div class="panel-footer-info">
+          <div class="quick-rule-tip">
+            <span>💡 Dica:</span> 3 símbolos idênticos pagam até 100x! 2 símbolos já garantem retorno.
+          </div>
+        </div>
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- OVERLAY E MODAIS -->
+  <div id="modal-overlay" class="modal-overlay">
+
+    <!-- Modal de Boas-Vindas (Primeiro Acesso) -->
+    <div id="welcome-modal" class="modal-window welcome-modal">
+      <div class="modal-decor-icon">🎰</div>
+      <h2 class="modal-title">BEM-VINDO AO CYBER SLOTS!</h2>
+      <p class="modal-lead">Sua experiência futurista de caça-níqueis com adrenalina e moedas 100% virtuais.</p>
+      
+      <div class="welcome-gift-card">
+        <div class="gift-icon">🎁</div>
+        <div class="gift-info">
+          <span class="gift-label">BÔNUS DE BOAS-VINDAS:</span>
+          <strong class="gift-amount">+1.000 MOEDAS VIRTUAIS</strong>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="welcome-player-name">Escolha seu Apelido no Ranking:</label>
+        <input type="text" id="welcome-player-name" maxlength="14" placeholder="Ex: CyberMaster777" value="CyberPlayer">
+      </div>
+
+      <div class="modal-disclaimer-box">
+        <p>⚠️ <strong>Aviso Importante:</strong> Este é um jogo de entretenimento casual. As moedas são virtuais, não possuem valor monetário, não podem ser trocadas por dinheiro real nem exigem pagamentos.</p>
+      </div>
+
+      <button id="btn-start-game" class="btn-modal-primary">COMEÇAR A JOGAR</button>
+    </div>
+
+    <!-- Modal da Tabela de Pagamentos e Regras -->
+    <div id="paytable-modal" class="modal-window paytable-modal">
+      <div class="modal-header-row">
+        <h2 class="modal-title">TABELA DE MULTIPLICADORES</h2>
+        <button class="modal-close-btn" aria-label="Fechar">&times;</button>
+      </div>
+      <p class="modal-sub">Premiações baseadas na linha de pagamento central:</p>
+      
+      <div id="paytable-symbols-list" class="paytable-grid">
+        <!-- Renderizado dinamicamente via js/app.js -->
+      </div>
+
+      <div class="paytable-rules-summary">
+        <h4>Regras do Jogo:</h4>
+        <ul>
+          <li><strong>3 símbolos iguais:</strong> multiplicador integral listado acima.</li>
+          <li><strong>2 símbolos iguais:</strong> retorno parcial para manter sua adrenalina.</li>
+          <li><strong>👑 Coroa Suprema:</strong> maior combinação do jogo (100x aposta!).</li>
+          <li>O jogo utiliza um algoritmo de RNG (Random Number Generator) nativo executado no navegador.</li>
+        </ul>
+      </div>
+
+      <button class="btn-modal-primary modal-close-btn">FECHAR TABELA</button>
+    </div>
+
+    <!-- Modal de Editar Perfil -->
+    <div id="profile-modal" class="modal-window profile-modal">
+      <div class="modal-header-row">
+        <h2 class="modal-title">EDITAR PERFIL</h2>
+        <button class="modal-close-btn" aria-label="Fechar">&times;</button>
+      </div>
+
+      <div class="form-group">
+        <label for="profile-player-name">Seu Apelido:</label>
+        <input type="text" id="profile-player-name" maxlength="14" placeholder="Apelido">
+      </div>
+
+      <div class="form-group">
+        <label for="profile-avatar-select">Escolha seu Avatar Neon:</label>
+        <select id="profile-avatar-select">
+          <option value="⚡">⚡ Raio Neon</option>
+          <option value="🥷">🥷 Ninja Cyber</option>
+          <option value="🤖">🤖 Androide</option>
+          <option value="👾">👾 Pixel Retro</option>
+          <option value="🔮">🔮 Orbe Mágico</option>
+          <option value="👑">👑 Realeza</option>
+          <option value="🎲">🎲 Dado da Sorte</option>
+          <option value="🚀">🚀 Foguete</option>
+        </select>
+      </div>
+
+      <button id="btn-save-profile" class="btn-modal-primary">SALVAR PERFIL</button>
+    </div>
+
+    <!-- Modal Especial de JACKPOT / Super Prêmio -->
+    <div id="jackpot-modal" class="modal-window jackpot-modal">
+      <div class="jackpot-crown-anim">👑</div>
+      <h2 class="jackpot-title">JACKPOT SUPREMO!</h2>
+      <p id="jackpot-message" class="jackpot-sub">TRÊS COROAS NEON ALINHADAS!</p>
+      
+      <div class="jackpot-amount-banner">
+        <span id="jackpot-win-amount" class="jackpot-val">+100.000</span>
+        <span class="jackpot-currency">MOEDAS VIRTUAIS</span>
+      </div>
+
+      <button id="btn-claim-jackpot" class="btn-modal-primary jackpot-claim-btn">COLETAR PRÊMIO!</button>
+    </div>
+
+  </div>
+
+  <!-- Toast de Notificações Rápidas -->
+  <div id="toast" class="toast-notification"></div>
+
+  <!-- Scripts Universais em Ordem de Dependência e Segurança -->
+  <script src="js/config.js"></script>
+  <script src="js/security.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/particles.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/ranking.js"></script>
+  <script src="js/slotMachine.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
