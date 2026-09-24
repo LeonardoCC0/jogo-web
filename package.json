@@ -16,5 +16,8 @@
     "vercel"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "google-auth-library": "^11.1.0"
+  }
 }

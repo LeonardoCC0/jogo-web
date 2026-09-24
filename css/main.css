@@ -182,6 +182,7 @@ body {
   50% { opacity: 0.4; transform: scale(0.85); }
 }
 
+
 /* Topo Centro: Cartão de Saldo */
 .header-center {
   display: flex;

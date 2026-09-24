@@ -12,6 +12,8 @@
   <link rel="stylesheet" href="css/main.css">
   <link rel="stylesheet" href="css/machine.css">
   <link rel="stylesheet" href="css/components.css">
+  <!-- SDK oficial do Google -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -80,6 +82,26 @@
         </button>
       </div>
     </div>
+
+    <!-- Botão de Reset Voluntário -->
+    <button id="btn-reset-voluntary" class="btn-secondary">Resetar Progresso (1000 Coins)</button>
+
+    <!-- Modal exibido apenas quando o saldo for 0 -->
+    <div id="modal-game-over" class="modal-overlay" style="display: none;">
+      <div class="modal-content">
+        <h2>Fim de Jogo!</h2>
+        <p>Você perdeu todas as suas Costa Coins.</p>
+        <p>Sua única opção é reiniciar o jogo. Como punição, você retornará com <strong>500 Costa Coins</strong>.</p>
+        <button id="btn-reset-punishment" class="btn-primary">Reiniciar (500 Costa Coins)</button>
+      </div>
+    </div>
+
+    <!-- Botão do Google Login -->
+    <div id="g_id_onload"
+        data-client_id="701601557497-m4m4geq1p3oj242pnvqvg11eeld6jd1s.apps.googleusercontent.com"
+        data-callback="handleGoogleLogin">
+    </div>
+    <div class="g_id_signin" data-type="standard"></div>
   </header>
 
   <!-- Abas para telas móveis (Smartphones e Tablets pequenos) -->

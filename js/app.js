@@ -941,3 +941,82 @@
   });
 
 })();
+
+// Função genérica para resetar o saldo
+function resetBalance(coins) {
+    localStorage.setItem('costa_coins', coins);
+    updateCoinDisplay(coins); // Atualiza o elemento de texto na tela
+}
+
+// Reset Voluntário (1000 Costa Coins)
+document.getElementById('btn-reset-voluntary').addEventListener('click', () => {
+    const confirmReset = confirm("Tem certeza de que deseja resetar? Seu saldo voltará para 1000 Costa Coins.");
+    if (confirmReset) {
+        resetBalance(1000);
+    }
+});
+
+// Reset por Punição (500 Costa Coins)
+document.getElementById('btn-reset-punishment').addEventListener('click', () => {
+    resetBalance(500);
+    document.getElementById('modal-game-over').style.display = 'none';
+    document.getElementById('btn-spin').disabled = false; // Reativa o botão do jogo
+});
+
+// Verificação disparada após cada rodada do jogo
+function checkCoinsStatus(currentCoins) {
+    if (currentCoins <= 0) {
+        // Bloqueia ações e força o modal
+        document.getElementById('btn-spin').disabled = true; 
+        document.getElementById('modal-game-over').style.display = 'flex';
+    }
+}
+
+function handleGoogleLogin(response) {
+    const idToken = response.credential;
+
+    // Envia o Token para validação no seu backend
+    fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: idToken })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            console.log("Login realizado com sucesso:", data.user);
+            // Salva dados do usuário localmente ou atualiza a tela
+            localStorage.setItem('user', JSON.stringify(data.user));
+            // Carrega o saldo do usuário autenticado se aplicável
+        }
+    })
+    .catch(err => console.error("Erro na autenticação:", err));
+}
+
+const { OAuth2Client } = require('google-auth-library');
+const CLIENT_ID = 'SEU_CLIENT_ID_AQUI.apps.googleusercontent.com';
+const client = new OAuth2Client(CLIENT_ID);
+
+app.post('/api/auth/google', async (req, res) => {
+    const { token } = req.body;
+    try {
+        const ticket = await client.verifyIdToken({
+            idToken: token,
+            audience: CLIENT_ID,
+        });
+        
+        const payload = ticket.getPayload();
+        const googleId = payload['sub'];
+        const email = payload['email'];
+        const name = payload['name'];
+
+        // Lógica de banco de dados (db.json): buscar ou criar o usuário
+        // Retorne as moedas associadas ao perfil
+        res.json({
+            success: true,
+            user: { id: googleId, name, email }
+        });
+    } catch (error) {
+        res.status(401).json({ success: false, message: 'Token do Google inválido' });
+    }
+});
