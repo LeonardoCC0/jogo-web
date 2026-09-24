@@ -73,6 +73,9 @@
         playerNameText: document.getElementById('player-name-text'),
         playerAvatarIcon: document.getElementById('player-avatar-icon'),
         bestWinText: document.getElementById('best-win-text'),
+        btnResetVoluntary: document.getElementById('btn-reset-voluntary'),
+        btnResetPunishment: document.getElementById('btn-reset-punishment'),
+        gameOverModal: document.getElementById('modal-game-over'),
 
         // Máquina e Rolos
         slotMachineWrapper: document.getElementById('slot-machine-wrapper'),
@@ -445,6 +448,25 @@
         });
       }
 
+      // Reset Voluntário (o jogador escolhe zerar o progresso manualmente)
+      if (this.dom.btnResetVoluntary) {
+        this.dom.btnResetVoluntary.addEventListener('click', () => {
+          audioSystem.playClick();
+          const confirmReset = confirm('Tem certeza de que deseja resetar? Seu saldo voltará para 1.000 moedas.');
+          if (confirmReset) {
+            this.resetBalance(1000);
+          }
+        });
+      }
+
+      // Reset por Punição (saldo chegou a zero, modal "Fim de Jogo")
+      if (this.dom.btnResetPunishment) {
+        this.dom.btnResetPunishment.addEventListener('click', () => {
+          audioSystem.playClick();
+          this.resetBalance(500);
+        });
+      }
+
       // Alternar Abas no Modal de Auth
       if (this.dom.tabLoginBtn) {
         this.dom.tabLoginBtn.addEventListener('click', () => this.setAuthMode('login'));
@@ -736,6 +758,9 @@
       // Atualiza Ranking Global Real
       rankingSystem.fetchAndUpdate(this.currentUser);
 
+      // Zerou as moedas? Bloqueia o jogo e força o reset por punição (500 moedas)
+      this.checkGameOver();
+
       if (this.isAutoSpin) {
         const waitTime = outcome.isWin ? (outcome.type === 'jackpot' ? 4500 : 2000) : (this.isTurbo ? 350 : 800);
         this.autoSpinTimer = setTimeout(() => {
@@ -802,6 +827,66 @@
       };
 
       requestAnimationFrame(step);
+    }
+
+    // Verifica se o saldo zerou e força o modal de "Fim de Jogo"
+    checkGameOver() {
+      if (this.balance <= 0) {
+        this.stopAutoSpin();
+        this.dom.btnSpin.disabled = true;
+        if (this.dom.gameOverModal) {
+          this.openModal(this.dom.gameOverModal);
+        }
+      }
+    }
+
+    // Reseta o saldo (usado pelo botão manual e pelo reset por punição ao zerar moedas)
+    // amount: 1000 (voluntário, a qualquer momento) ou 500 (punição, só quando zerou)
+    async resetBalance(amount) {
+      const resetType = amount === 500 ? 'punishment' : 'voluntary';
+
+      this.balance = amount;
+      storage.setBalance(amount);
+
+      if (this.dom.balanceText) {
+        this.dom.balanceText.textContent = amount.toLocaleString('pt-BR');
+        this.dom.balanceText.classList.add('balance-pulse');
+        setTimeout(() => this.dom.balanceText.classList.remove('balance-pulse'), 300);
+      }
+
+      // Se o jogador estiver autenticado, o saldo real vive no servidor -
+      // sem isso, o próximo giro sobrescreveria o valor local com o saldo antigo.
+      if (this.currentUser && this.authToken) {
+        try {
+          const res = await fetch('/api/reset', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${this.authToken}`
+            },
+            body: JSON.stringify({ type: resetType })
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            this.balance = data.balance;
+            this.currentUser.balance = data.balance;
+            storage.setUserData(this.currentUser);
+            if (this.dom.balanceText) {
+              this.dom.balanceText.textContent = data.balance.toLocaleString('pt-BR');
+            }
+          } else {
+            this.showToast('⚠️ ' + (data.error || 'Não foi possível sincronizar o reset com o servidor.'));
+          }
+        } catch (err) {
+          this.showToast('⚠️ Erro de comunicação ao resetar o saldo.');
+        }
+      }
+
+      if (this.dom.gameOverModal) {
+        this.dom.gameOverModal.style.display = 'none';
+      }
+      this.closeAllModals();
+      this.dom.btnSpin.disabled = false;
     }
 
     // Saldo insuficiente (Sem opção de recarga artificial)
@@ -942,36 +1027,6 @@
 
 })();
 
-// Função genérica para resetar o saldo
-function resetBalance(coins) {
-    localStorage.setItem('costa_coins', coins);
-    updateCoinDisplay(coins); // Atualiza o elemento de texto na tela
-}
-
-// Reset Voluntário (1000 Costa Coins)
-document.getElementById('btn-reset-voluntary').addEventListener('click', () => {
-    const confirmReset = confirm("Tem certeza de que deseja resetar? Seu saldo voltará para 1000 Costa Coins.");
-    if (confirmReset) {
-        resetBalance(1000);
-    }
-});
-
-// Reset por Punição (500 Costa Coins)
-document.getElementById('btn-reset-punishment').addEventListener('click', () => {
-    resetBalance(500);
-    document.getElementById('modal-game-over').style.display = 'none';
-    document.getElementById('btn-spin').disabled = false; // Reativa o botão do jogo
-});
-
-// Verificação disparada após cada rodada do jogo
-function checkCoinsStatus(currentCoins) {
-    if (currentCoins <= 0) {
-        // Bloqueia ações e força o modal
-        document.getElementById('btn-spin').disabled = true; 
-        document.getElementById('modal-game-over').style.display = 'flex';
-    }
-}
-
 function handleGoogleLogin(response) {
     const idToken = response.credential;
 
@@ -992,31 +1047,3 @@ function handleGoogleLogin(response) {
     })
     .catch(err => console.error("Erro na autenticação:", err));
 }
-
-const { OAuth2Client } = require('google-auth-library');
-const CLIENT_ID = 'SEU_CLIENT_ID_AQUI.apps.googleusercontent.com';
-const client = new OAuth2Client(CLIENT_ID);
-
-app.post('/api/auth/google', async (req, res) => {
-    const { token } = req.body;
-    try {
-        const ticket = await client.verifyIdToken({
-            idToken: token,
-            audience: CLIENT_ID,
-        });
-        
-        const payload = ticket.getPayload();
-        const googleId = payload['sub'];
-        const email = payload['email'];
-        const name = payload['name'];
-
-        // Lógica de banco de dados (db.json): buscar ou criar o usuário
-        // Retorne as moedas associadas ao perfil
-        res.json({
-            success: true,
-            user: { id: googleId, name, email }
-        });
-    } catch (error) {
-        res.status(401).json({ success: false, message: 'Token do Google inválido' });
-    }
-});

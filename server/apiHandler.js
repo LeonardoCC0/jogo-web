@@ -323,6 +323,43 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
     });
   }
 
+  // 6.5 RESET DE SALDO
+  // type "punishment" (500 moedas): só é permitido quando o saldo já chegou a zero.
+  // type "voluntary" (1000 moedas): o jogador pode reiniciar o progresso quando quiser.
+  if (pathname === '/api/reset' && method === 'POST') {
+    const token = extractToken(req, payload);
+    if (!token || !db.sessions[token]) {
+      return json(401, { error: 'Você precisa estar logado para resetar o saldo.' });
+    }
+
+    const session = db.sessions[token];
+    const user = db.users[session.username];
+    if (!user) {
+      return json(401, { error: 'Usuário não encontrado.' });
+    }
+
+    const resetType = payload.type === 'voluntary' ? 'voluntary' : 'punishment';
+
+    if (resetType === 'punishment') {
+      if (user.balance > 0) {
+        return json(400, { error: 'O reset por punição só é permitido quando o saldo chega a zero.' });
+      }
+      user.balance = 500;
+    } else {
+      user.balance = 1000;
+    }
+
+    user.score = user.balance;
+    user.updatedAt = Date.now();
+
+    await Database.save(db);
+
+    return json(200, {
+      success: true,
+      balance: user.balance
+    });
+  }
+
   // 7. RANKING GLOBAL 100% REAL (SEM BOTS)
   if (pathname === '/api/leaderboard' && method === 'GET') {
     const usersList = Object.values(db.users || {});
