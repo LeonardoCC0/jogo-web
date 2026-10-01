@@ -106,7 +106,7 @@
           let avatarDisplay = cleanAvatar;
           if (player.avatar && (player.avatar.startsWith('http://') || player.avatar.startsWith('https://'))) {
             const safeUrl = this.escapeHtml(player.avatar);
-            avatarDisplay = `<img src="${safeUrl}" alt="Foto do jogador" referrerpolicy="no-referrer" loading="lazy" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+            avatarDisplay = `<img src="${safeUrl}" alt="Avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
           }
           const cleanWin = parseInt(player.highestWin, 10) || 0;
           const cleanBalance = parseInt(player.balance, 10) || 0;

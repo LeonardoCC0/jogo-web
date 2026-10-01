@@ -1120,5 +1120,3 @@
 }
 
 
-.auth-google-option { display: grid; justify-items: center; gap: 10px; margin: 16px 0; color: var(--text-secondary, #a5adc5); }
-.player-profile-chip { cursor: pointer; }

@@ -243,12 +243,8 @@
         if (this.dom.playerAvatarIcon) {
           const av = this.currentUser.avatar || '⚡';
           if (av.startsWith('http://') || av.startsWith('https://')) {
-            const photo = document.createElement('img');
-            photo.src = av;
-            photo.alt = 'Foto do jogador';
-            photo.style.cssText = 'width:100%;height:100%;border-radius:50%;object-fit:cover';
-            photo.referrerPolicy = 'no-referrer';
-            this.dom.playerAvatarIcon.replaceChildren(photo);
+            const safeAv = sec ? sec.sanitizeInput(av, 250) : av;
+            this.dom.playerAvatarIcon.innerHTML = `<img src="${safeAv}" alt="Avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
           } else {
             this.dom.playerAvatarIcon.textContent = av;
           }
@@ -286,33 +282,6 @@
           this.dom.btnAdminPanel.classList.remove('is-founder');
         }
       }
-    }
-
-    openProfile() {
-      if (!this.currentUser) return;
-      this.dom.profileInput.value = this.currentUser.displayName || this.currentUser.username;
-      this.dom.profileAvatarSelect?.closest('.form-group')?.classList.add('hidden');
-      this.openModal(this.dom.profileModal);
-    }
-
-    async saveProfile() {
-      this.dom.btnSaveProfile.disabled = true;
-      try {
-        const res = await fetch('/api/profile', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.authToken}` },
-          body: JSON.stringify({ displayName: this.dom.profileInput.value.trim() })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Não foi possível salvar.');
-        this.currentUser = data.user;
-        storage.setUserData(data.user);
-        this.updateAuthUI();
-        this.closeAllModals();
-        await rankingSystem.fetchAndUpdate(this.currentUser);
-        this.showToast('✅ Nome atualizado no perfil e no ranking!');
-      } catch (err) { this.showToast(err.message); }
-      finally { this.dom.btnSaveProfile.disabled = false; }
     }
 
     openAuthModal(mode = 'login') {
@@ -486,11 +455,6 @@
     // =========================================================================
 
     bindEvents() {
-      this.dom.playerProfile?.addEventListener('click', () => this.openProfile());
-      this.dom.playerProfile?.addEventListener('keydown', e => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.openProfile(); }
-      });
-      this.dom.btnSaveProfile?.addEventListener('click', () => this.saveProfile());
       // Botão Girar
       this.dom.btnSpin.addEventListener('click', () => {
         audioSystem.playClick();
@@ -1163,7 +1127,6 @@ async function handleGoogleLogin(response) {
       app.closeAllModals();
       app.updateAuthUI();
       app.updateUI();
-      if (data.user.needsProfile) app.openProfile();
     }
 
     // Atualiza o ranking global com o usuário autenticado

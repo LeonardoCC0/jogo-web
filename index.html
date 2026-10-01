@@ -80,7 +80,7 @@
       </button>
 
       <!-- Card do Perfil do Jogador (quando logado) -->
-      <div id="player-profile" class="player-profile-chip hidden" role="button" tabindex="0" title="Editar seu nome no ranking" aria-label="Editar perfil">
+      <div id="player-profile" class="player-profile-chip hidden" title="Jogador conectado">
         <div id="player-avatar-icon" class="profile-avatar">⚡</div>
         <div class="profile-meta">
           <span id="player-name-text" class="profile-name">CyberPlayer</span>
@@ -293,10 +293,6 @@
 
       <div id="auth-error-box" class="auth-alert-box error hidden"></div>
       <div id="auth-success-box" class="auth-alert-box success hidden"></div>
-      <div class="auth-google-option">
-        <p>Entre ou crie sua conta com o Google</p>
-        <div class="g_id_signin" data-type="standard" data-theme="filled_black" data-size="large" data-text="continue_with" data-shape="pill"></div>
-      </div>
 
       <!-- Formulário de Login -->
       <form id="login-form" class="auth-form active">
@@ -406,7 +402,7 @@
 
       <div class="form-group">
         <label for="profile-player-name">Seu Apelido:</label>
-        <input type="text" id="profile-player-name" minlength="3" maxlength="24" placeholder="Seu nome no ranking">
+        <input type="text" id="profile-player-name" maxlength="14" placeholder="Apelido">
       </div>
 
       <div class="form-group">

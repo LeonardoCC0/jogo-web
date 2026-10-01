@@ -79,12 +79,11 @@
 
     getPlayerAvatar() {
       const raw = localStorage.getItem(STORAGE_KEYS.PLAYER_AVATAR) || '⚡';
-      if (/^https:\/\//.test(raw)) return raw;
       return sec ? sec.sanitizeInput(raw, 4) : raw.slice(0, 4);
     },
 
     setPlayerAvatar(avatar) {
-      const cleanAvatar = /^https:\/\//.test(avatar || '') ? avatar : (sec ? sec.sanitizeInput(avatar || '⚡', 4) : '⚡');
+      const cleanAvatar = sec ? sec.sanitizeInput(avatar || '⚡', 4) : '⚡';
       localStorage.setItem(STORAGE_KEYS.PLAYER_AVATAR, cleanAvatar || '⚡');
     },
 

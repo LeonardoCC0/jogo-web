@@ -182,7 +182,7 @@
       if (this.dom.currentAdminAvatar) {
         const av = this.currentUser.avatar || '👤';
         if (av.startsWith('http://') || av.startsWith('https://')) {
-          this.dom.currentAdminAvatar.innerHTML = `<img src="${this.escapeHtml(av)}" alt="Avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+          this.dom.currentAdminAvatar.innerHTML = `<img src="${av}" alt="Avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
         } else {
           this.dom.currentAdminAvatar.textContent = av;
         }
@@ -241,7 +241,6 @@
       if (this.dom.btnRefreshLogs) {
         this.dom.btnRefreshLogs.addEventListener('click', () => this.loadLogs());
       }
-      document.getElementById('btn-more-logs')?.addEventListener('click', () => this.loadLogs(true));
 
       // Filtros de jogadores
       if (this.dom.filterPlayerSearch) {
@@ -487,22 +486,21 @@
         } else {
           actions = `
             <div class="action-buttons-cell">
-              <button class="btn-row-action btn-bal" data-action="balance" data-id="${this.escapeHtml(u.id)}" data-name="${this.escapeHtml(u.displayName || u.username)}">🪙 Saldo</button>
+              <button class="btn-row-action btn-bal" data-action="balance" data-id="${u.id}" data-name="${u.displayName || u.username}">🪙 Saldo</button>
               ${isBanned
-                ? `<button class="btn-row-action btn-unban" data-action="unban" data-id="${this.escapeHtml(u.id)}" data-name="${this.escapeHtml(u.displayName || u.username)}">✅ Desbanir</button>`
-                : `<button class="btn-row-action btn-ban" data-action="ban" data-id="${this.escapeHtml(u.id)}" data-name="${this.escapeHtml(u.displayName || u.username)}">🚫 Banir</button>`
+                ? `<button class="btn-row-action btn-unban" data-action="unban" data-id="${u.id}" data-name="${u.displayName || u.username}">✅ Desbanir</button>`
+                : `<button class="btn-row-action btn-ban" data-action="ban" data-id="${u.id}" data-name="${u.displayName || u.username}">🚫 Banir</button>`
               }
-              <button class="btn-row-action btn-del" data-action="delete" data-id="${this.escapeHtml(u.id)}" data-name="${this.escapeHtml(u.displayName || u.username)}" data-username="${this.escapeHtml(u.username)}">🗑 Remover</button>
+              <button class="btn-row-action btn-del" data-action="delete" data-id="${u.id}" data-name="${u.displayName || u.username}" data-username="${u.username}">🗑 Remover</button>
             </div>
           `;
         }
 
-        actions += `<button class="btn-row-action" data-action="view" data-id="${this.escapeHtml(u.id)}">Ver</button>`;
         return `
           <tr>
             <td>
               <div class="user-cell">
-                <span class="user-avatar">${(u.avatar || '⚡').startsWith('http') ? '👤' : this.escapeHtml(u.avatar || '⚡')}</span>
+                <span class="user-avatar">${(u.avatar || '⚡').startsWith('http') ? '👤' : (u.avatar || '⚡')}</span>
                 <div class="user-meta">
                   <span class="user-display-name">${this.escapeHtml(u.displayName || u.username)}</span>
                   <span class="user-username">@${this.escapeHtml(u.username)}</span>
@@ -528,8 +526,7 @@
           const name = btn.getAttribute('data-name');
           const username = btn.getAttribute('data-username');
 
-          if (action === 'view') this.viewPlayer(id);
-          else if (action === 'balance') this.openBalanceModal(id, name);
+          if (action === 'balance') this.openBalanceModal(id, name);
           else if (action === 'ban') this.openBanModal(id, name);
           else if (action === 'unban') this.openUnbanModal(id, name);
           else if (action === 'delete') this.openDeleteModal(id, name, username);
@@ -540,25 +537,6 @@
     // =========================================================================
     // MODAL: ALTERAR SALDO
     // =========================================================================
-
-    viewPlayer(id) {
-      const user = this.allUsers.find(u => u.id === id);
-      if (!user) return;
-      const dialog = document.createElement('dialog');
-      dialog.className = 'player-details-dialog';
-      const title = document.createElement('h2');
-      title.textContent = user.displayName || user.username;
-      const details = document.createElement('pre');
-      details.textContent = `ID: ${user.id}\nUsername: ${user.username}\nEmail: ${user.email || '-'}\nSaldo: ${user.balance.toLocaleString('pt-BR')}\nRole: ${user.role}\nStatus: ${user.isBanned ? 'Banido' : 'Ativo'}\nMotivo: ${user.banReason || '-'}\nCadastro: ${new Date(user.createdAt).toLocaleString('pt-BR')}`;
-      const close = document.createElement('button');
-      close.className = 'btn-row-action';
-      close.textContent = 'Fechar';
-      close.addEventListener('click', () => dialog.close());
-      dialog.addEventListener('close', () => dialog.remove());
-      dialog.append(title, details, close);
-      document.body.append(dialog);
-      dialog.showModal();
-    }
 
     openBalanceModal(userId, userName) {
       const user = this.allUsers.find(u => u.id === userId);
@@ -610,11 +588,11 @@
       const user = this.allUsers.find(u => u.id === this._balanceTargetId);
       if (!user) return;
 
-      const amount = Number(this.dom.balInputAmount?.value);
+      const amount = parseInt(this.dom.balInputAmount?.value, 10);
       const reason = (this.dom.balInputReason?.value || '').trim();
       const mode = this.dom.balInputTypeSet?.checked ? 'set' : 'add';
 
-      if (!Number.isSafeInteger(amount) || amount < 0 || amount > 100000000) {
+      if (!amount || amount <= 0) {
         this.showToast('Informe um valor válido.', 'error');
         return;
       }
@@ -630,7 +608,7 @@
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${this.authToken}`
           },
-          body: JSON.stringify({ targetId: this._balanceTargetId, mode, amount, reason, expectedBalance: user.balance })
+          body: JSON.stringify({ targetId: this._balanceTargetId, mode, amount, reason })
         });
 
         const data = await res.json();
@@ -846,7 +824,7 @@
         } else {
           actions = `
             <div class="action-buttons-cell">
-              <button class="btn-row-action btn-demote" data-action="demote" data-id="${this.escapeHtml(u.id)}" data-name="${this.escapeHtml(u.displayName || u.username)}">⬇ Rebaixar</button>
+              <button class="btn-row-action btn-demote" data-action="demote" data-id="${u.id}" data-name="${u.displayName || u.username}">⬇ Rebaixar</button>
             </div>
           `;
         }
@@ -855,7 +833,7 @@
           <tr>
             <td>
               <div class="user-cell">
-                <span class="user-avatar">${(u.avatar || '👤').startsWith('http') ? '👤' : this.escapeHtml(u.avatar || '👤')}</span>
+                <span class="user-avatar">${(u.avatar || '👤').startsWith('http') ? '👤' : (u.avatar || '👤')}</span>
                 <div class="user-meta">
                   <span class="user-display-name">${this.escapeHtml(u.displayName || u.username)}</span>
                   <span class="user-username">@${this.escapeHtml(u.username)}</span>
@@ -898,7 +876,7 @@
         } else {
           this.dom.promoteSelectUser.innerHTML =
             '<option value="">Selecione um jogador...</option>' +
-            eligible.map(u => `<option value="${this.escapeHtml(u.id)}">${this.escapeHtml(u.displayName || u.username)} (@${this.escapeHtml(u.username)})</option>`).join('');
+            eligible.map(u => `<option value="${u.id}">${this.escapeHtml(u.displayName || u.username)} (@${this.escapeHtml(u.username)})</option>`).join('');
         }
       }
 
@@ -1002,12 +980,9 @@
     // LOGS DE AUDITORIA
     // =========================================================================
 
-    async loadLogs(append = false) {
-      const more = document.getElementById('btn-more-logs');
-      if (more) more.disabled = true;
+    async loadLogs() {
       try {
-        const query = append && this.logsCursor ? `?before=${encodeURIComponent(this.logsCursor)}` : '';
-        const res = await fetch('/api/admin/logs' + query, {
+        const res = await fetch('/api/admin/logs', {
           headers: { 'Authorization': `Bearer ${this.authToken}` }
         });
 
@@ -1022,13 +997,11 @@
         const data = await res.json();
         if (!data.success) return;
 
-        this.allLogs = append ? [...this.allLogs, ...(data.logs || [])] : (data.logs || []);
-        this.logsCursor = data.nextCursor;
-        more?.classList.toggle('hidden', !data.nextCursor);
+        this.allLogs = data.logs || [];
         this.renderLogsTable();
       } catch (e) {
         console.error('Erro ao carregar logs:', e);
-      } finally { if (more) more.disabled = false; }
+      }
     }
 
     renderLogsTable() {

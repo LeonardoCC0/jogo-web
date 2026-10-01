@@ -22,6 +22,21 @@ const SYMBOLS = [
 ];
 
 async function verifyGoogleIdToken(token) {
+  // Suporte a mock controlado apenas em ambiente de teste automatizado
+  if (process.env.NODE_ENV === 'test' && token && token.startsWith('mock_google_token_')) {
+    const sub = token.replace('mock_google_token_', '');
+    return {
+      sub,
+      email: `user_${sub}@gmail.com`,
+      name: `Google User ${sub}`,
+      picture: '⚡',
+      email_verified: true,
+      iss: 'https://accounts.google.com',
+      aud: GOOGLE_CLIENT_ID,
+      exp: Math.floor(Date.now() / 1000) + 3600
+    };
+  }
+
   const ticket = await googleClient.verifyIdToken({
     idToken: token,
     audience: GOOGLE_CLIENT_ID
@@ -137,24 +152,24 @@ function extractToken(req, payload) {
   if (payload && payload.token) {
     return String(payload.token).trim();
   }
-  const cookie = (req.headers?.cookie || '').split(';').map(v => v.trim()).find(v => v.startsWith('cns_session='));
-  return cookie ? cookie.slice(12) : null;
+  return null;
 }
 
 const FOUNDER_EMAIL = '47131@raphaeldisanto.com.br';
-const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
-const { AsyncLocalStorage } = require('async_hooks');
-const founderContext = new AsyncLocalStorage();
 
 function isFounderUser(user) {
-  return !!user && user.id === founderContext.getStore()?.founderId;
+  if (!user) return false;
+  if (user.role === 'founder') return true;
+  if (user.email && user.email.toLowerCase() === FOUNDER_EMAIL) return true;
+  if (user.username && user.username.toLowerCase() === FOUNDER_EMAIL) return true;
+  return false;
 }
 
 function ensureFounderRole(user) {
   if (user && isFounderUser(user)) {
     user.role = 'founder';
     user.isBanned = false;
-  } else if (user?.role === 'founder') user.role = 'user';
+  }
 }
 
 function getAuthenticatedUser(req, payload, db) {
@@ -162,7 +177,7 @@ function getAuthenticatedUser(req, payload, db) {
   if (!token || !db.sessions || !db.sessions[token]) return null;
   const session = db.sessions[token];
   const user = db.users && db.users[session.username];
-  if (!user || session.userId !== user.id || !Number.isFinite(session.createdAt) || session.createdAt + SESSION_TTL <= Date.now()) {
+  if (!user) {
     delete db.sessions[token];
     return null;
   }
@@ -185,37 +200,15 @@ function sanitizeUser(user) {
     isBanned: !!user.isBanned,
     banReason: user.banReason || '',
     bannedAt: user.bannedAt || null,
-    needsProfile: !!user.needsProfile,
     createdAt: user.createdAt
   };
 }
 
-function sessionCookie(req, token) {
-  const secure = process.env.VERCEL || req.socket?.encrypted || process.env.COOKIE_SECURE === 'true';
-  return `cns_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${token ? SESSION_TTL / 1000 : 0}${secure ? '; Secure' : ''}`;
-}
-
-function requireAuth(req, payload, db) {
-  const auth = getAuthenticatedUser(req, payload, db);
-  if (!auth) return { status: 401, error: 'Sessão inválida ou expirada.' };
-  if (auth.user.isBanned || auth.user.role === 'banned') return { status: 403, error: `Conta banida. Motivo: ${auth.user.banReason || 'Violação das regras.'}` };
-  return auth;
-}
-
-function requireAdmin(req, payload, db) {
-  const auth = requireAuth(req, payload, db);
-  if (auth.error) return auth;
-  if (!['admin', 'founder'].includes(auth.user.role)) return { status: 403, error: 'Acesso negado.' };
-  return auth;
-}
-
-async function routeRequest(req, res, pathname, method, payload = {}) {
+async function handleApiRequest(req, res, pathname, method, payload = {}) {
   const json = (statusCode, data) => {
     res.writeHead(statusCode, {
       'Content-Type': 'application/json',
-      'Cache-Control': 'no-store',
-      ...(data.token ? { 'Set-Cookie': sessionCookie(req, data.token) } : {}),
-      ...(pathname === '/api/auth/logout' ? { 'Set-Cookie': sessionCookie(req, '') } : {}),
+      'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Session-Token',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
     });
@@ -227,22 +220,6 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
   }
 
   const db = await Database.get();
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return json(400, { error: 'Corpo inválido.' });
-  if (method !== 'GET' && req.headers?.origin) {
-    try { if (new URL(req.headers.origin).host !== req.headers.host) return json(403, { error: 'Origem não autorizada.' }); }
-    catch { return json(403, { error: 'Origem inválida.' }); }
-  }
-  if (pathname.startsWith('/api/admin') || pathname.startsWith('/api/auth/')) {
-    const token = extractToken(req, payload);
-    const session = token && db.sessions[token];
-    const identity = session?.userId || req.socket?.remoteAddress || 'anonymous';
-    const key = crypto.createHash('sha256').update(identity + (pathname.startsWith('/api/admin') ? ':admin' : ':auth')).digest('hex');
-    db.rateLimits ||= {};
-    for (const [k, entry] of Object.entries(db.rateLimits)) if (entry.until <= Date.now()) delete db.rateLimits[k];
-    const limit = db.rateLimits[key] ||= { count: 0, until: Date.now() + 60000 };
-    if (++limit.count > (session ? 120 : 30)) { await Database.save(db); return json(429, { error: 'Muitas tentativas. Aguarde um minuto.' }); }
-    await Database.save(db);
-  }
 
   // 1. Status / Health
   if (pathname === '/api/health' && method === 'GET') {
@@ -277,10 +254,9 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
 
     const salt = crypto.randomBytes(16).toString('hex');
     const passwordHash = hashPassword(password, salt);
-    const userId = 'u_' + crypto.randomUUID();
+    const userId = 'u_' + crypto.randomUUID().slice(0, 8);
 
-    if (key === FOUNDER_EMAIL || email === FOUNDER_EMAIL) return json(403, { error: 'A conta fundadora exige identidade verificada. Utilize Google ou a conta configurada no servidor.' });
-    const isFounder = false;
+    const isFounder = (key === FOUNDER_EMAIL || email === FOUNDER_EMAIL);
 
     const newUser = {
       id: userId,
@@ -331,15 +307,15 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
     const key = rawUsername.toLowerCase();
     const user = db.users[key];
 
-    if (!user || !user.salt || !user.passwordHash || !verifyPassword(password, user.salt, user.passwordHash)) {
+    if (!user || !verifyPassword(password, user.salt, user.passwordHash)) {
       return json(401, { error: 'Usuário ou senha incorretos.' });
     }
 
     ensureFounderRole(user);
 
     if (user.isBanned || user.role === 'banned') {
-      return json(403, {
-        error: `Sua conta foi banida. Motivo: ${user.banReason || 'Violação das diretrizes do jogo.'}`
+      return json(403, { 
+        error: `Sua conta foi banida. Motivo: ${user.banReason || 'Violação das diretrizes do jogo.'}` 
       });
     }
 
@@ -372,10 +348,10 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
       gPayload = await verifyGoogleIdToken(token);
     } catch (err) {
       console.warn('Falha na validação do Google ID Token:', err.message);
-      return json(401, { error: 'Token do Google inválido ou expirado.' });
+      return json(401, { error: 'Token do Google inválido ou expirado: ' + err.message });
     }
 
-    if (!gPayload || !gPayload.sub || gPayload.email_verified !== true) {
+    if (!gPayload || !gPayload.sub) {
       return json(401, { error: 'Dados do Google inválidos (sub ausente).' });
     }
 
@@ -389,19 +365,18 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
 
     // 2. Se não encontrou por googleId, verificar se já existe conta pelo email para vincular
     if (!user && googleEmail) {
-      const existing = Object.values(db.users).find(u => u.email && u.email.toLowerCase() === googleEmail);
-      if (existing) {
-        const auth = requireAuth(req, {}, db);
-        if (auth.error || auth.user.id !== existing.id) return json(409, { error: 'Entre na conta existente antes de vincular o Google.' });
-        if (existing.googleId && existing.googleId !== googleSub) return json(409, { error: 'Conta já vinculada.' });
-        user = existing;
+      user = Object.values(db.users).find(u => u.email && u.email.toLowerCase() === googleEmail);
+      if (user) {
         user.googleId = googleSub;
+        if (!user.avatar || user.avatar === '⚡') {
+          user.avatar = googleAvatar;
+        }
       }
     }
 
     // 3. Se ainda não existir, criar a conta automaticamente
     if (!user) {
-      const userId = 'u_g_' + crypto.randomUUID();
+      const userId = 'u_g_' + crypto.randomUUID().slice(0, 8);
       let baseUsername = (gPayload.given_name || googleName || (googleEmail ? googleEmail.split('@')[0] : ''))
         .replace(/[^a-zA-Z0-9_-]/g, '')
         .slice(0, 12);
@@ -416,12 +391,11 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
         counter++;
       }
 
-      const isFounder = false;
+      const isFounder = (googleEmail === FOUNDER_EMAIL);
 
       user = {
         id: userId,
         googleId: googleSub,
-        needsProfile: true,
         email: googleEmail,
         username: candidateKey,
         displayName: cleanString(googleName, 16) || candidateKey,
@@ -440,23 +414,21 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
       // Usuário existente:
       // NÃO resetar saldo, NÃO criar 2ª conta, manter highestWin e score
       ensureFounderRole(user);
+      if (googleEmail === FOUNDER_EMAIL) {
+        user.role = 'founder';
+        user.isBanned = false;
+      }
       user.updatedAt = Date.now();
+      if (googleName && (!user.displayName || user.displayName === user.username)) {
+        user.displayName = cleanString(googleName, 16);
+      }
     }
 
     if (user.isBanned || user.role === 'banned') {
-      return json(403, {
-        error: `Sua conta foi banida. Motivo: ${user.banReason || 'Violação das regras do jogo.'}`
+      return json(403, { 
+        error: `Sua conta foi banida. Motivo: ${user.banReason || 'Violação das regras do jogo.'}` 
       });
     }
-
-    user.avatar = typeof googleAvatar === 'string' && /^https:\/\//.test(googleAvatar) ? googleAvatar : '⚡';
-    // Para domínio externo, Google só é autoridade quando há Workspace (hd).
-    if (!db.founderId && googleEmail === FOUNDER_EMAIL && gPayload.hd === 'raphaeldisanto.com.br') {
-      db.founderId = user.id;
-      founderContext.getStore().founderId = user.id;
-      for (const [key, session] of Object.entries(db.sessions)) if (session.userId === user.id) delete db.sessions[key];
-    }
-    ensureFounderRole(user);
 
     // Gera token de sessão unificado (idêntico ao login por senha)
     const sessionToken = crypto.randomBytes(32).toString('hex');
@@ -486,29 +458,15 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
     if (user.isBanned || user.role === 'banned') {
       delete db.sessions[token];
       await Database.save(db);
-      return json(403, {
-        error: `Sua conta foi banida. Motivo: ${user.banReason || 'Violação das regras do jogo.'}`
+      return json(403, { 
+        error: `Sua conta foi banida. Motivo: ${user.banReason || 'Violação das regras do jogo.'}` 
       });
     }
 
     return json(200, {
       success: true,
-      token,
       user: sanitizeUser(user)
     });
-  }
-
-  if (pathname === '/api/profile' && method === 'POST') {
-    const auth = requireAuth(req, payload, db);
-    if (auth.error) return json(auth.status, { error: auth.error });
-    if (Object.keys(payload).some(k => k !== 'displayName')) return json(400, { error: 'Somente o apelido pode ser alterado.' });
-    const displayName = cleanString(payload.displayName, 24);
-    if (typeof payload.displayName !== 'string' || displayName.length < 3 || payload.displayName.trim().length > 24) return json(400, { error: 'Escolha um apelido de 3 a 24 caracteres.' });
-    auth.user.displayName = displayName;
-    auth.user.needsProfile = false;
-    auth.user.updatedAt = Date.now();
-    await Database.save(db);
-    return json(200, { success: true, user: sanitizeUser(auth.user) });
   }
 
   // 5. LOGOUT (/api/auth/logout)
@@ -616,7 +574,7 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
 
   // 7. RANKING GLOBAL 100% REAL (SEM BOTS)
   if (pathname === '/api/leaderboard' && method === 'GET') {
-    const usersList = Object.values(db.users || {}).filter(u => !u.isBanned && u.role !== 'banned');
+    const usersList = Object.values(db.users || {});
 
     // Converte apenas jogadores reais cadastrados
     const leaderboard = usersList.map(u => ({
@@ -649,27 +607,22 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
   }
 
   // 9. ROTAS ADMINISTRATIVAS PROTEGIDAS NO BACKEND (/api/admin/*)
-  if (pathname === '/api/admin' || pathname.startsWith('/api/admin/')) {
-    const auth = requireAdmin(req, payload, db);
-    if (auth.error) return json(auth.status, { error: auth.error });
-    if (Object.hasOwn(payload, 'role')) return json(400, { error: 'Role não pode ser enviada nesta API.' });
+  if (pathname.startsWith('/api/admin/')) {
+    const auth = getAuthenticatedUser(req, payload, db);
+    if (!auth) {
+      return json(401, { error: 'Acesso não autorizado: sessão inválida ou token ausente.' });
+    }
 
     const { user: adminUser } = auth;
     if (adminUser.isBanned || adminUser.role === 'banned') {
       return json(403, { error: 'Acesso negado: sua conta foi banida.' });
     }
 
-    const isFounder = isFounderUser(adminUser);
+    const isFounder = adminUser.role === 'founder' || isFounderUser(adminUser);
     const isAdmin = isFounder || adminUser.role === 'admin';
 
     if (!isAdmin) {
       return json(403, { error: 'Acesso negado: privilégios administrativos insuficientes.' });
-    }
-
-    if (pathname === '/api/admin/page' && method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY' });
-      res.end(require('fs').readFileSync(require('path').join(__dirname, 'admin.html'), 'utf8'));
-      return;
     }
 
     // 9.1 Validação de Sessão Administrativa (/api/admin/check)
@@ -705,8 +658,7 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
 
     // 9.3 Listagem de Jogadores (/api/admin/users)
     if (pathname === '/api/admin/users' && method === 'GET') {
-      const query = new URL(req.url || pathname, 'http://localhost').searchParams;
-      const search = cleanString(query.get('search') || payload.search || req.headers['x-search'] || '', 80).toLowerCase();
+      const search = cleanString(payload.search || req.headers['x-search'] || '', 50).toLowerCase();
       let users = Object.values(db.users || {});
 
       if (search) {
@@ -737,15 +689,14 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
     // 9.4 Alterar Saldo de Jogador (/api/admin/users/balance)
     if (pathname === '/api/admin/users/balance' && method === 'POST') {
       const targetId = String(payload.targetId || '').trim();
-      const mode = payload.mode;
-      const amount = payload.amount;
-      if (!['set', 'add'].includes(mode)) return json(400, { error: 'Operação inválida.' });
+      const mode = payload.mode === 'set' ? 'set' : 'add';
+      const amount = parseInt(payload.amount, 10);
       const reason = cleanString(payload.reason, 120);
 
       if (!targetId) {
         return json(400, { error: 'Identificador do jogador não informado.' });
       }
-      if (!Number.isSafeInteger(amount) || Math.abs(amount) > 100000000) {
+      if (isNaN(amount)) {
         return json(400, { error: 'Valor de saldo inválido.' });
       }
       if (!reason || reason.length < 3) {
@@ -758,7 +709,7 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
       }
 
       // Proteção: Fundador não pode ter saldo alterado por outros administradores
-      if (isFounderUser(target)) {
+      if (isFounderUser(target) && !isFounder) {
         return json(403, { error: 'A conta fundadora é protegida e seu saldo não pode ser alterado por outros administradores.' });
       }
 
@@ -768,7 +719,6 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
       }
 
       const prevBalance = target.balance || 0;
-      if (payload.expectedBalance !== undefined && payload.expectedBalance !== prevBalance) return json(409, { error: 'Saldo mudou. Atualize os jogadores e confirme novamente.' });
       let newBalance = mode === 'set' ? amount : prevBalance + amount;
 
       if (newBalance < 0) {
@@ -785,13 +735,13 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
       // Registro de Auditoria Obrigatório
       if (!db.admin_logs) db.admin_logs = [];
       const logEntry = {
-        id: 'log_' + crypto.randomUUID(),
+        id: 'log_' + crypto.randomUUID().slice(0, 8),
         adminId: adminUser.id,
         adminEmail: adminUser.email || adminUser.username,
         adminUsername: adminUser.displayName || adminUser.username,
         action: 'balance_change',
         targetUserId: target.id,
-        targetUsername: target.username,
+        targetUsername: target.displayName || target.username,
         saldoAnterior: prevBalance,
         saldoNovo: newBalance,
         diferenca: newBalance - prevBalance,
@@ -833,15 +783,14 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
 
       // Não banir a si próprio
       if (target.id === adminUser.id) {
-        return json(403, { error: 'Você não pode banir a sua própria conta.' });
+        return json(400, { error: 'Você não pode banir a sua própria conta.' });
       }
 
       // Apenas o Fundador pode banir outro administrador
-      if ((target.role === 'admin' || target.roleBeforeBan === 'admin') && !isFounder) {
+      if (target.role === 'admin' && !isFounder) {
         return json(403, { error: 'Apenas o Fundador possui permissão para banir administradores.' });
       }
 
-      target.roleBeforeBan = target.roleBeforeBan || target.role;
       target.isBanned = true;
       target.role = 'banned';
       target.banReason = reason;
@@ -858,13 +807,13 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
       // Registro de Auditoria
       if (!db.admin_logs) db.admin_logs = [];
       db.admin_logs.unshift({
-        id: 'log_' + crypto.randomUUID(),
+        id: 'log_' + crypto.randomUUID().slice(0, 8),
         adminId: adminUser.id,
         adminEmail: adminUser.email || adminUser.username,
         adminUsername: adminUser.displayName || adminUser.username,
         action: 'user_banned',
         targetUserId: target.id,
-        targetUsername: target.username,
+        targetUsername: target.displayName || target.username,
         motivo: reason,
         timestamp: Date.now()
       });
@@ -886,24 +835,21 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
         return json(404, { error: 'Jogador não encontrado.' });
       }
 
-      if (isFounderUser(target) || target.id === adminUser.id || (!isFounder && (target.role === 'admin' || target.roleBeforeBan === 'admin'))) return json(403, { error: 'Conta protegida.' });
-      if (!target.isBanned && target.role !== 'banned') return json(400, { error: 'Conta não está banida.' });
       target.isBanned = false;
       target.role = 'user';
-      delete target.roleBeforeBan;
       delete target.banReason;
       delete target.bannedAt;
       target.updatedAt = Date.now();
 
       if (!db.admin_logs) db.admin_logs = [];
       db.admin_logs.unshift({
-        id: 'log_' + crypto.randomUUID(),
+        id: 'log_' + crypto.randomUUID().slice(0, 8),
         adminId: adminUser.id,
         adminEmail: adminUser.email || adminUser.username,
         adminUsername: adminUser.displayName || adminUser.username,
         action: 'user_unbanned',
         targetUserId: target.id,
-        targetUsername: target.username,
+        targetUsername: target.displayName || target.username,
         motivo: 'Desbanimento administrativo',
         timestamp: Date.now()
       });
@@ -935,7 +881,7 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
         return json(400, { error: 'Você não pode excluir sua própria conta pelo painel.' });
       }
 
-      if ((target.role === 'admin' || target.roleBeforeBan === 'admin') && !isFounder) {
+      if (target.role === 'admin' && !isFounder) {
         return json(403, { error: 'Apenas o Fundador pode remover contas de administradores.' });
       }
 
@@ -953,13 +899,13 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
 
       if (!db.admin_logs) db.admin_logs = [];
       db.admin_logs.unshift({
-        id: 'log_' + crypto.randomUUID(),
+        id: 'log_' + crypto.randomUUID().slice(0, 8),
         adminId: adminUser.id,
         adminEmail: adminUser.email || adminUser.username,
         adminUsername: adminUser.displayName || adminUser.username,
         action: 'user_deleted',
         targetUserId: target.id,
-        targetUsername: target.username,
+        targetUsername: target.displayName || target.username,
         motivo: cleanString(payload.reason || 'Remoção permanente de conta', 120),
         timestamp: Date.now()
       });
@@ -989,7 +935,7 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
       }
 
       if (isFounderUser(target)) {
-        return json(403, { error: 'Este usuário já é o Fundador.' });
+        return json(400, { error: 'Este usuário já é o Fundador.' });
       }
 
       target.role = 'admin';
@@ -997,13 +943,13 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
 
       if (!db.admin_logs) db.admin_logs = [];
       db.admin_logs.unshift({
-        id: 'log_' + crypto.randomUUID(),
+        id: 'log_' + crypto.randomUUID().slice(0, 8),
         adminId: adminUser.id,
         adminEmail: adminUser.email || adminUser.username,
         adminUsername: adminUser.displayName || adminUser.username,
         action: 'admin_promoted',
         targetUserId: target.id,
-        targetUsername: target.username,
+        targetUsername: target.displayName || target.username,
         motivo: 'Promovido a Administrador pelo Fundador',
         timestamp: Date.now()
       });
@@ -1033,19 +979,18 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
         return json(403, { error: 'O Fundador não pode revogar seus próprios privilégios.' });
       }
 
-      if (target.isBanned || target.role !== 'admin') return json(400, { error: 'Conta não é um administrador ativo.' });
       target.role = 'user';
       target.updatedAt = Date.now();
 
       if (!db.admin_logs) db.admin_logs = [];
       db.admin_logs.unshift({
-        id: 'log_' + crypto.randomUUID(),
+        id: 'log_' + crypto.randomUUID().slice(0, 8),
         adminId: adminUser.id,
         adminEmail: adminUser.email || adminUser.username,
         adminUsername: adminUser.displayName || adminUser.username,
         action: 'admin_demoted',
         targetUserId: target.id,
-        targetUsername: target.username,
+        targetUsername: target.displayName || target.username,
         motivo: 'Privilégio de Administrador revogado pelo Fundador',
         timestamp: Date.now()
       });
@@ -1062,17 +1007,11 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
     // 9.10 Logs de Auditoria (/api/admin/logs)
     if (pathname === '/api/admin/logs' && method === 'GET') {
       const logs = db.admin_logs || [];
-      const filtered = isFounder ? logs : logs.filter(l => l.adminId === adminUser.id);
-      const before = new URL(req.url || pathname, 'http://localhost').searchParams.get('before');
-      const cursorIndex = before ? filtered.findIndex(l => l.id === before) : -1;
-      if (before && cursorIndex < 0) return json(400, { error: 'Página de logs inválida.' });
-      const start = cursorIndex + 1;
-      const page = filtered.slice(start, start + 100);
+      const filtered = isFounder ? logs : logs.filter(l => l.action !== 'admin_promoted' && l.action !== 'admin_demoted');
 
       return json(200, {
         success: true,
-        logs: page,
-        nextCursor: start + page.length < filtered.length ? page[page.length - 1].id : null
+        logs: filtered.slice(0, 100)
       });
     }
 
@@ -1082,37 +1021,7 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
   return json(404, { error: 'Rota não encontrada.' });
 }
 
-async function handleApiRequest(req, res, pathname, method, payload = {}) {
-  const result = await Database.transaction(async () => {
-    const db = await Database.get();
-    // Migração somente por ID definido pelo operador, nunca pelo navegador.
-    const configuredId = process.env.FOUNDER_USER_ID || require('./founder.json').userId;
-    if (!db.founderId && configuredId) {
-      const candidate = Object.values(db.users).find(u => u.id === configuredId);
-      if (!candidate && process.env.FOUNDER_USER_ID) throw new Error('FOUNDER_USER_ID inexistente');
-      if (candidate) {
-        db.founderId = candidate.id;
-        for (const [token, session] of Object.entries(db.sessions)) if (session.userId === candidate.id) delete db.sessions[token];
-        await Database.save(db);
-      }
-    }
-    return founderContext.run({ founderId: db.founderId }, async () => {
-      for (const user of Object.values(db.users)) {
-        const previous = user.role;
-        ensureFounderRole(user);
-        if (previous !== user.role) {
-          for (const [token, session] of Object.entries(db.sessions)) if (session.userId === user.id) delete db.sessions[token];
-          await Database.save(db);
-        }
-      }
-      const response = { status: 500, headers: {}, body: '' };
-      const buffered = { writeHead(status, headers) { response.status = status; response.headers = headers; }, end(body) { response.body = body; } };
-      await routeRequest(req, buffered, pathname, method, payload);
-      return response;
-    });
-  });
-  res.writeHead(result.status, result.headers);
-  res.end(result.body);
-}
-
-module.exports = { handleApiRequest, SYMBOLS };
+module.exports = {
+  handleApiRequest,
+  SYMBOLS
+};
