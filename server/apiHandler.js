@@ -172,15 +172,19 @@ function ensureFounderRole(user) {
   }
 }
 
-function getAuthenticatedUser(req, payload, db) {
+async function getAuthenticatedUser(req, payload, db) {
   const token = extractToken(req, payload);
-  if (!token || !db.sessions || !db.sessions[token]) return null;
-  const session = db.sessions[token];
+  if (!token) return null;
+
+  const session = await Database.getSession(token);
+  if (!session) return null;
+
   const user = db.users && db.users[session.username];
   if (!user) {
-    delete db.sessions[token];
+    await Database.deleteSession(token);
     return null;
   }
+
   ensureFounderRole(user);
   return { user, token };
 }
@@ -353,13 +357,12 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
 
     // Gera token de sessão
     const sessionToken = crypto.randomBytes(32).toString('hex');
-    db.sessions[sessionToken] = {
+    await Database.save(db);
+    await Database.createSession(sessionToken, {
       userId: newUser.id,
       username: key,
       createdAt: Date.now()
-    };
-
-    await Database.save(db);
+    });
 
     return json(201, {
       success: true,
@@ -394,13 +397,12 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
     }
 
     const sessionToken = crypto.randomBytes(32).toString('hex');
-    db.sessions[sessionToken] = {
+    await Database.save(db);
+    await Database.createSession(sessionToken, {
       userId: user.id,
       username: key,
       createdAt: Date.now()
-    };
-
-    await Database.save(db);
+    });
 
     return json(200, {
       success: true,
@@ -509,13 +511,12 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
 
     // Gera token de sessão unificado (idêntico ao login por senha)
     const sessionToken = crypto.randomBytes(32).toString('hex');
-    db.sessions[sessionToken] = {
+    await Database.save(db);
+    await Database.createSession(sessionToken, {
       userId: user.id,
       username: user.username,
       createdAt: Date.now()
-    };
-
-    await Database.save(db);
+    });
 
     return json(200, {
       success: true,
@@ -526,14 +527,14 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
 
   // 4. VERIFICAÇÃO DE SESSÃO ATIVA (/api/auth/me)
   if (pathname === '/api/auth/me' && method === 'GET') {
-    const auth = getAuthenticatedUser(req, payload, db);
+    const auth = await getAuthenticatedUser(req, payload, db);
     if (!auth) {
       return json(401, { error: 'Sessão inválida ou expirada.' });
     }
 
     const { user, token } = auth;
     if (user.isBanned || user.role === 'banned') {
-      delete db.sessions[token];
+      await Database.deleteSession(token);
       await Database.save(db);
       return json(403, { 
         error: `Sua conta foi banida. Motivo: ${user.banReason || 'Violação das regras do jogo.'}` 
@@ -549,16 +550,15 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
   // 5. LOGOUT (/api/auth/logout)
   if (pathname === '/api/auth/logout' && method === 'POST') {
     const token = extractToken(req, payload);
-    if (token && db.sessions[token]) {
-      delete db.sessions[token];
-      await Database.save(db);
+    if (token) {
+      await Database.deleteSession(token);
     }
     return json(200, { success: true });
   }
 
   // 6. GIRO AUTORITATIVO NO SERVIDOR (COM PERSISTÊNCIA REAL DE SCORE)
   if (pathname === '/api/spin' && method === 'POST') {
-    const auth = getAuthenticatedUser(req, payload, db);
+    const auth = await getAuthenticatedUser(req, payload, db);
     if (!auth) {
       return json(401, { error: 'Você precisa estar logado para jogar.' });
     }
@@ -617,7 +617,7 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
   // type "punishment" (500 moedas): só é permitido quando o saldo já chegou a zero.
   // type "voluntary" (1000 moedas): o jogador pode reiniciar o progresso quando quiser.
   if (pathname === '/api/reset' && method === 'POST') {
-    const auth = getAuthenticatedUser(req, payload, db);
+    const auth = await getAuthenticatedUser(req, payload, db);
     if (!auth) {
       return json(401, { error: 'Você precisa estar logado para resetar o saldo.' });
     }
@@ -686,7 +686,7 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
 
   // 9. ROTAS ADMINISTRATIVAS PROTEGIDAS NO BACKEND (/api/admin/*)
   if (pathname.startsWith('/api/admin/')) {
-    const auth = getAuthenticatedUser(req, payload, db);
+    const auth = await getAuthenticatedUser(req, payload, db);
     if (!auth) {
       return json(401, { error: 'Acesso não autorizado: sessão inválida ou token ausente.' });
     }
@@ -876,11 +876,7 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
       target.updatedAt = Date.now();
 
       // Invalidação imediata de todas as sessões ativas do usuário banido
-      for (const [sToken, sData] of Object.entries(db.sessions || {})) {
-        if (sData.username === target.username || sData.userId === target.id) {
-          delete db.sessions[sToken];
-        }
-      }
+      await Database.deleteSessionsForUser(target.id, target.username);
 
       // Registro de Auditoria
       if (!db.admin_logs) db.admin_logs = [];
@@ -968,11 +964,7 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
       }
 
       // Limpeza de sessões e dados do usuário
-      for (const [sToken, sData] of Object.entries(db.sessions || {})) {
-        if (sData.username === target.username || sData.userId === target.id) {
-          delete db.sessions[sToken];
-        }
-      }
+      await Database.deleteSessionsForUser(target.id, target.username);
       delete db.users[target.username];
 
       if (!db.admin_logs) db.admin_logs = [];
