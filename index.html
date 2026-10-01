@@ -197,7 +197,7 @@
           <div class="bet-control-group">
             <div class="bet-label-row">
               <span class="control-label">VALOR DA APOSTA VIRTUAL</span>
-              <span class="control-hint">Mín: 5 • Máx: 1.000</span>
+              <span class="control-hint">Mín: 5 • Máx: seu saldo</span>
             </div>
             
             <div class="bet-input-box">
@@ -207,7 +207,7 @@
                 <span id="bet-display" class="bet-amount">25</span>
               </div>
               <button id="btn-bet-plus" class="btn-bet-step" title="Aumentar aposta em 5" aria-label="Aumentar aposta">+</button>
-              <button id="btn-max-bet" class="btn-max" title="Apostar valor máximo permitido">MÁX</button>
+              <button id="btn-max-bet" class="btn-max" title="Apostar todo o saldo atual">MÁX</button>
             </div>
 
             <!-- Fichas Rápidas de Aposta -->
@@ -410,17 +410,9 @@
       </div>
 
       <div class="form-group">
-        <label for="profile-avatar-select">Escolha seu Avatar Neon:</label>
-        <select id="profile-avatar-select">
-          <option value="⚡">⚡ Raio Neon</option>
-          <option value="🥷">🥷 Ninja Cyber</option>
-          <option value="🤖">🤖 Androide</option>
-          <option value="👾">👾 Pixel Retro</option>
-          <option value="🔮">🔮 Orbe Mágico</option>
-          <option value="👑">👑 Realeza</option>
-          <option value="🎲">🎲 Dado da Sorte</option>
-          <option value="🚀">🚀 Foguete</option>
-        </select>
+        <label for="profile-avatar-file">Foto de perfil:</label>
+        <input type="file" id="profile-avatar-file" accept="image/jpeg,image/png,image/webp" aria-describedby="profile-avatar-help">
+        <small id="profile-avatar-help">JPG, PNG ou WebP, até 5 MB. Sem escolher um arquivo, sua foto atual será mantida.</small>
       </div>
 
       <button id="btn-save-profile" class="btn-modal-primary">SALVAR PERFIL</button>

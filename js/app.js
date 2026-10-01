@@ -30,6 +30,7 @@
       this.autoSpinTimer = null;
       this.slotMachine = null;
       this.lastSpinTime = 0;
+      this.balanceAnimation = null;
 
       this.currentUser = null;
       this.authToken = storage.getAuthToken();
@@ -141,7 +142,7 @@
 
         // Profile Modal
         profileInput: document.getElementById('profile-player-name'),
-        profileAvatarSelect: document.getElementById('profile-avatar-select'),
+        profileAvatarFile: document.getElementById('profile-avatar-file'),
         btnSaveProfile: document.getElementById('btn-save-profile'),
 
         // Jackpot Modal
@@ -242,7 +243,7 @@
         }
         if (this.dom.playerAvatarIcon) {
           const av = this.currentUser.avatar || '⚡';
-          if (av.startsWith('http://') || av.startsWith('https://')) {
+          if (/^https?:\/\//.test(av) || av.startsWith('data:image/jpeg;base64,')) {
             const photo = document.createElement('img');
             photo.src = av;
             photo.alt = 'Foto do jogador';
@@ -291,17 +292,45 @@
     openProfile() {
       if (!this.currentUser) return;
       this.dom.profileInput.value = this.currentUser.displayName || this.currentUser.username;
-      this.dom.profileAvatarSelect?.closest('.form-group')?.classList.add('hidden');
+      this.dom.profileAvatarFile.value = '';
       this.openModal(this.dom.profileModal);
+    }
+
+    async readProfilePhoto(file) {
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        throw new Error('Escolha uma foto JPG, PNG ou WebP.');
+      }
+      if (file.size > 5 * 1024 * 1024) throw new Error('A foto deve ter no máximo 5 MB.');
+      const url = URL.createObjectURL(file);
+      try {
+        const image = new Image();
+        image.src = url;
+        await image.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 256;
+        const context = canvas.getContext('2d');
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, 256, 256);
+        const size = Math.min(image.naturalWidth, image.naturalHeight);
+        context.drawImage(image, (image.naturalWidth - size) / 2, (image.naturalHeight - size) / 2, size, size, 0, 0, 256, 256);
+        return canvas.toDataURL('image/jpeg', 0.8);
+      } catch {
+        throw new Error('Não foi possível ler essa foto. Escolha outro arquivo.');
+      } finally {
+        URL.revokeObjectURL(url);
+      }
     }
 
     async saveProfile() {
       this.dom.btnSaveProfile.disabled = true;
       try {
+        const payload = { displayName: this.dom.profileInput.value.trim() };
+        const file = this.dom.profileAvatarFile.files[0];
+        if (file) payload.avatar = await this.readProfilePhoto(file);
         const res = await fetch('/api/profile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.authToken}` },
-          body: JSON.stringify({ displayName: this.dom.profileInput.value.trim() })
+          body: JSON.stringify(payload)
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Não foi possível salvar.');
@@ -310,7 +339,7 @@
         this.updateAuthUI();
         this.closeAllModals();
         await rankingSystem.fetchAndUpdate(this.currentUser);
-        this.showToast('✅ Nome atualizado no perfil e no ranking!');
+        this.showToast('✅ Perfil atualizado no jogo e no ranking!');
       } catch (err) { this.showToast(err.message); }
       finally { this.dom.btnSaveProfile.disabled = false; }
     }
@@ -625,8 +654,7 @@
       // Aposta Máxima
       this.dom.btnMaxBet.addEventListener('click', () => {
         audioSystem.playClick();
-        const maxPossible = Math.min(window.CONFIG.MAX_BET, this.balance > 0 ? this.balance : window.CONFIG.MAX_BET);
-        this.setBet(maxPossible);
+        this.setBet(this.balance);
       });
 
       // Modo Turbo
@@ -706,7 +734,7 @@
     }
 
     setBet(newBet) {
-      const clamped = Math.max(window.CONFIG.MIN_BET, Math.min(window.CONFIG.MAX_BET, newBet));
+      const clamped = Math.max(window.CONFIG.MIN_BET, Math.min(this.balance, newBet));
       this.currentBet = clamped;
       this.dom.betDisplay.textContent = this.currentBet.toLocaleString('pt-BR');
 
@@ -806,9 +834,10 @@
 
       // Sincroniza saldo e recorde reais confirmados pelo servidor
       if (outcome.newBalance !== undefined) {
-        this.balance = outcome.newBalance;
+        this.animateBalanceChange(outcome.newBalance - this.balance);
         if (this.currentUser) {
           this.currentUser.balance = outcome.newBalance;
+          this.currentUser.score = outcome.score ?? outcome.newBalance;
           if (outcome.highestWin !== undefined) {
             this.currentUser.highestWin = outcome.highestWin;
           }
@@ -819,7 +848,6 @@
       if (outcome.isWin && outcome.winAmount > 0) {
         this.slotMachine.highlightWin();
         this.dom.slotMachineWrapper.classList.add('machine-winning');
-        this.animateBalanceChange(outcome.winAmount);
 
         if (outcome.highestWin) {
           this.dom.bestWinText.textContent = outcome.highestWin.toLocaleString('pt-BR');
@@ -895,6 +923,7 @@
     }
 
     animateBalanceChange(diff) {
+      cancelAnimationFrame(this.balanceAnimation);
       const startVal = this.balance;
       const endVal = Math.max(0, startVal + diff);
       this.balance = endVal;
@@ -910,15 +939,16 @@
         this.dom.balanceText.textContent = currentVal.toLocaleString('pt-BR');
 
         if (progress < 1) {
-          requestAnimationFrame(step);
+          this.balanceAnimation = requestAnimationFrame(step);
         } else {
+          this.balanceAnimation = null;
           this.dom.balanceText.textContent = endVal.toLocaleString('pt-BR');
           this.dom.balanceText.classList.add('balance-pulse');
           setTimeout(() => this.dom.balanceText.classList.remove('balance-pulse'), 300);
         }
       };
 
-      requestAnimationFrame(step);
+      this.balanceAnimation = requestAnimationFrame(step);
     }
 
     // Verifica se o saldo zerou e força o modal de "Fim de Jogo"
@@ -1077,6 +1107,8 @@
     }
 
     updateUI() {
+      cancelAnimationFrame(this.balanceAnimation);
+      this.balanceAnimation = null;
       this.dom.balanceText.textContent = this.balance.toLocaleString('pt-BR');
       this.setBet(this.currentBet);
     }

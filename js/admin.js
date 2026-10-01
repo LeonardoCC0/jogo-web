@@ -181,7 +181,7 @@
       }
       if (this.dom.currentAdminAvatar) {
         const av = this.currentUser.avatar || '👤';
-        if (av.startsWith('http://') || av.startsWith('https://')) {
+        if (/^https?:\/\//.test(av) || av.startsWith('data:image/jpeg;base64,')) {
           this.dom.currentAdminAvatar.innerHTML = `<img src="${this.escapeHtml(av)}" alt="Avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
         } else {
           this.dom.currentAdminAvatar.textContent = av;
@@ -502,7 +502,7 @@
           <tr>
             <td>
               <div class="user-cell">
-                <span class="user-avatar">${(u.avatar || '⚡').startsWith('http') ? '👤' : this.escapeHtml(u.avatar || '⚡')}</span>
+                <span class="user-avatar">${/^(https?:|data:image\/)/.test(u.avatar || '') ? '👤' : this.escapeHtml(u.avatar || '⚡')}</span>
                 <div class="user-meta">
                   <span class="user-display-name">${this.escapeHtml(u.displayName || u.username)}</span>
                   <span class="user-username">@${this.escapeHtml(u.username)}</span>
@@ -568,7 +568,7 @@
 
       if (this.dom.balModalAvatar) {
         const av = user.avatar || '👤';
-        this.dom.balModalAvatar.textContent = av.startsWith('http') ? '👤' : av;
+        this.dom.balModalAvatar.textContent = /^(https?:|data:image\/)/.test(av) ? '👤' : av;
       }
       if (this.dom.balModalName) this.dom.balModalName.textContent = user.displayName || user.username;
       if (this.dom.balModalSub) this.dom.balModalSub.textContent = `@${user.username} • ${user.email || 'sem email'}`;
@@ -855,7 +855,7 @@
           <tr>
             <td>
               <div class="user-cell">
-                <span class="user-avatar">${(u.avatar || '👤').startsWith('http') ? '👤' : this.escapeHtml(u.avatar || '👤')}</span>
+                <span class="user-avatar">${/^(https?:|data:image\/)/.test(u.avatar || '') ? '👤' : this.escapeHtml(u.avatar || '👤')}</span>
                 <div class="user-meta">
                   <span class="user-display-name">${this.escapeHtml(u.displayName || u.username)}</span>
                   <span class="user-username">@${this.escapeHtml(u.username)}</span>

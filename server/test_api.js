@@ -108,6 +108,26 @@ async function run() {
   eq([again.data.user.id, again.data.user.balance, again.data.user.displayName], [g.user.id, previous, 'My Chosen Name'], 'Google relogin preserves account, money and name');
   const rank = (await call('/api/leaderboard')).data.leaderboard.find(p => p.id === g.user.id);
   eq([rank.name, rank.avatar], ['My Chosen Name', 'https://lh3.googleusercontent.com/test-photo'], 'public ranking name and photo');
+  const uploadedPhoto = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2Q==';
+  eq((await call('/api/profile', null, { displayName: 'Guest', avatar: uploadedPhoto })).status, 401, 'photo upload requires login');
+  for (const avatar of ['https://example.com/photo.jpg', 'data:image/svg+xml;base64,PHN2Zz4=', 'data:image/jpeg;base64,aGVsbG8=', 'data:image/jpeg;base64,' + 'A'.repeat(120000)]) {
+    eq((await call('/api/profile', g.token, { displayName: 'My Chosen Name', avatar })).status, 400, 'invalid photo rejected');
+  }
+  const photoUpdate = await call('/api/profile', g.token, { displayName: 'My Chosen Name', avatar: uploadedPhoto });
+  eq(photoUpdate.status, 200, 'photo upload accepted');
+  eq(photoUpdate.data.user.avatar, uploadedPhoto, 'photo returned to profile');
+  eq((await call('/api/leaderboard')).data.leaderboard.find(p => p.id === g.user.id).avatar, uploadedPhoto, 'uploaded photo in ranking');
+  eq((await call('/api/profile', g.token, { displayName: 'My Chosen Name' })).data.user.avatar, uploadedPhoto, 'name-only edit preserves photo');
+  eq((await call('/api/auth/google', null, { token: 'google-player' })).data.user.avatar, uploadedPhoto, 'Google relogin preserves uploaded photo');
+  eq((await call('/api/auth/me', g.token)).data.user.avatar, uploadedPhoto, 'photo persists in session');
+  await mutate(db => { db.users[g.user.username].balance = 2503; });
+  eq((await call('/api/spin', g.token, { bet: 2504 })).status, 400, 'cannot bet above current balance');
+  for (const bet of [0, 4, 5.5, '2503', null]) {
+    eq((await call('/api/spin', g.token, { bet })).status, 400, 'invalid bet rejected');
+  }
+  const allIn = await call('/api/spin', g.token, { bet: 2503 });
+  eq(allIn.status, 200, 'can bet entire balance above 1000');
+  eq(allIn.data.outcome.newBalance, allIn.data.outcome.winAmount, 'entire balance deducted exactly once');
   eq((await call('/api/reset', g.token, { type: 'voluntary' })).data.balance, 1000, 'reset remains functional');
   eq((await call('/api/admin/check', null, undefined, 'GET', { cookie: 'cns_session=' + founder.token })).status, 200, 'page cookie shares existing session');
   eq((await call('/api/admin/users/ban', founder.token, { targetId: user.user.id, reason: 'test' }, 'POST', { origin: 'https://evil.test', host: 'game.test' })).status, 403, 'cross-origin mutation rejected');

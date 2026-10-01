@@ -10,7 +10,6 @@ const CONFIG = {
   // Moedas e Apostas Virtuais (Sem recarga artificial)
   INITIAL_BALANCE: 1000,
   MIN_BET: 5,
-  MAX_BET: 1000,
   DEFAULT_BET: 25,
   BET_PRESETS: [10, 25, 50, 100, 250, 500],
   

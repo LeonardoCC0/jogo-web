@@ -104,7 +104,7 @@
           const cleanName = this.escapeHtml(player.name);
           const cleanAvatar = this.escapeHtml(player.avatar || '👤');
           let avatarDisplay = cleanAvatar;
-          if (player.avatar && (player.avatar.startsWith('http://') || player.avatar.startsWith('https://'))) {
+          if (player.avatar && (/^https?:\/\//.test(player.avatar) || player.avatar.startsWith('data:image/jpeg;base64,'))) {
             const safeUrl = this.escapeHtml(player.avatar);
             avatarDisplay = `<img src="${safeUrl}" alt="Foto do jogador" referrerpolicy="no-referrer" loading="lazy" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
           }
@@ -151,9 +151,6 @@
     }
 
     escapeHtml(str) {
-      if (root.CNS_SECURITY && root.CNS_SECURITY.sanitizeInput) {
-        str = root.CNS_SECURITY.sanitizeInput(String(str), 16);
-      }
       return String(str)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')

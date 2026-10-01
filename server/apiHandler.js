@@ -481,7 +481,7 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
       });
     }
 
-    user.avatar = googleAvatar;
+    if (user.avatarSource !== 'upload') user.avatar = googleAvatar;
 
     // Para domínio externo, Google só é autoridade quando há Workspace (hd).
     if (!db.founderId && googleEmail === FOUNDER_EMAIL && gPayload.hd === 'raphaeldisanto.com.br') {
@@ -535,9 +535,20 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
   if (pathname === '/api/profile' && method === 'POST') {
     const auth = requireAuth(req, payload, db);
     if (auth.error) return json(auth.status, { error: auth.error });
-    if (Object.keys(payload).some(k => k !== 'displayName')) return json(400, { error: 'Somente o apelido pode ser alterado.' });
+    if (Object.keys(payload).some(k => !['displayName', 'avatar'].includes(k))) return json(400, { error: 'Somente o apelido e a foto podem ser alterados.' });
     const displayName = cleanString(payload.displayName, 24);
     if (typeof payload.displayName !== 'string' || displayName.length < 3 || payload.displayName.trim().length > 24) return json(400, { error: 'Escolha um apelido de 3 a 24 caracteres.' });
+    if (Object.hasOwn(payload, 'avatar')) {
+      if (typeof payload.avatar !== 'string' || payload.avatar.length > 120000 || !/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(payload.avatar)) {
+        return json(400, { error: 'Foto inválida ou muito grande. Escolha outro arquivo.' });
+      }
+      const photo = Buffer.from(payload.avatar.split(',')[1], 'base64');
+      if (photo.length < 4 || photo[0] !== 0xff || photo[1] !== 0xd8 || photo[2] !== 0xff || photo[photo.length - 2] !== 0xff || photo[photo.length - 1] !== 0xd9) {
+        return json(400, { error: 'Formato de foto inválido.' });
+      }
+      auth.user.avatar = payload.avatar;
+      auth.user.avatarSource = 'upload';
+    }
     auth.user.displayName = displayName;
     auth.user.needsProfile = false;
     auth.user.updatedAt = Date.now();
@@ -567,9 +578,9 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
       return json(403, { error: 'Sua conta está banida e não pode realizar apostas.' });
     }
 
-    const betAmount = parseInt(payload.bet, 10);
-    if (isNaN(betAmount) || betAmount < 5 || betAmount > 1000) {
-      return json(400, { error: 'Valor de aposta inválido (mínimo 5, máximo 1.000).' });
+    const betAmount = payload.bet;
+    if (!Number.isSafeInteger(betAmount) || betAmount < 5) {
+      return json(400, { error: 'Valor de aposta inválido (mínimo 5 moedas).' });
     }
 
     if (user.balance < betAmount) {
