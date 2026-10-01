@@ -3,18 +3,8 @@ const path = require('path');
 const { AsyncLocalStorage } = require('async_hooks');
 const scope = new AsyncLocalStorage();
 const DB_FILE = process.env.NODE_ENV === 'test' ? process.env.TEST_DB_FILE : path.join(__dirname, 'data', 'db.json');
-const KV_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-const KV_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
-const KEY = 'cyber_slots_db_v1';
 let queue = Promise.resolve();
 function initial() { return { users: {}, sessions: {}, history: [], admin_logs: [], total_spins: 0 }; }
-async function redis(command) {
-  const res = await fetch(KV_URL, { method: 'POST', headers: { Authorization: `Bearer ${KV_TOKEN}`, 'Content-Type': 'application/json' }, body: JSON.stringify(command), signal: AbortSignal.timeout(10000) });
-  if (!res.ok) throw new Error('Persistência indisponível');
-  const data = await res.json();
-  if (data.error) throw new Error('Persistência indisponível');
-  return data.result;
-}
 function parse(raw) {
   let data = raw ? JSON.parse(raw) : initial();
   if (typeof data === 'string') data = JSON.parse(data);
@@ -24,8 +14,6 @@ const Database = {
   isCloudMode: () => !!(KV_URL && KV_TOKEN),
   async get() {
     if (scope.getStore()) return scope.getStore().data;
-    if (this.isCloudMode()) return parse(await redis(['GET', KEY]));
-    if (process.env.VERCEL) throw new Error('Configure Redis para persistência em produção');
     if (!DB_FILE) throw new Error('TEST_DB_FILE obrigatório em testes');
     return parse(fs.existsSync(DB_FILE) ? fs.readFileSync(DB_FILE, 'utf8') : null);
   },
