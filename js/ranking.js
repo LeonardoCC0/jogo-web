@@ -1,6 +1,7 @@
 /**
  * CYBER NEON SLOTS - Sistema de Ranking Global 100% Real (Sem Bots)
  * Conecta-se à API autoritativa (/api/leaderboard) para exibir apenas jogadores reais cadastrados.
+ * Sincroniza em tempo real o saldo e posição do jogador atual com o cabeçalho do jogo.
  */
 
 (function(root) {
@@ -21,7 +22,10 @@
 
     async fetchLeaderboard() {
       try {
-        const res = await fetch('/api/leaderboard');
+        const res = await fetch('/api/leaderboard?t=' + Date.now(), {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
         if (res.ok) {
           const data = await res.json();
           if (data && Array.isArray(data.leaderboard)) {
@@ -42,9 +46,9 @@
       this.render(list, currentUser);
     }
 
-    getCurrentUserRank(currentUser) {
-      if (!currentUser || !this.cachedLeaderboard.length) return null;
-      const index = this.cachedLeaderboard.findIndex(p =>
+    getCurrentUserRank(currentUser, list = this.cachedLeaderboard) {
+      if (!currentUser || !list || !list.length) return null;
+      const index = list.findIndex(p =>
         (p.id && currentUser.id && p.id === currentUser.id) ||
         (p.name && currentUser.username && p.name.toLowerCase() === currentUser.username.toLowerCase())
       );
@@ -54,9 +58,55 @@
     render(list = this.cachedLeaderboard, currentUser = null) {
       if (!this.container) return;
 
-      const currentRank = this.getCurrentUserRank(currentUser);
+      // Trabalha sobre uma cópia da lista
+      let displayList = Array.isArray(list) ? list.map(item => ({ ...item })) : [];
+
+      // Sincroniza dados do usuário logado se fornecido
+      if (currentUser) {
+        let userInList = displayList.find(p =>
+          (p.id && currentUser.id && p.id === currentUser.id) ||
+          (p.name && currentUser.username && p.name.toLowerCase() === currentUser.username.toLowerCase())
+        );
+
+        if (userInList) {
+          if (currentUser.balance !== undefined) {
+            userInList.balance = currentUser.balance;
+          }
+          if (currentUser.highestWin !== undefined && currentUser.highestWin > (userInList.highestWin || 0)) {
+            userInList.highestWin = currentUser.highestWin;
+          }
+        } else if (currentUser.username) {
+          // Se o usuário ainda não está no retorno da API, inclui para cálculo de posição
+          userInList = {
+            id: currentUser.id,
+            name: currentUser.displayName || currentUser.username,
+            avatar: currentUser.avatar || '⚡',
+            balance: currentUser.balance !== undefined ? currentUser.balance : 1000,
+            highestWin: currentUser.highestWin || 0,
+            score: currentUser.balance !== undefined ? currentUser.balance : 1000
+          };
+          displayList.push(userInList);
+        }
+
+        // Reordena pelo saldo atualizado para manter a classificação impecável
+        displayList.sort((a, b) => {
+          const balA = parseInt(a.balance, 10) || 0;
+          const balB = parseInt(b.balance, 10) || 0;
+          if (balB !== balA) return balB - balA;
+          return (parseInt(b.highestWin, 10) || 0) - (parseInt(a.highestWin, 10) || 0);
+        });
+      }
+
+      const currentRank = this.getCurrentUserRank(currentUser, displayList);
       const rankChanged = this.previousRank !== null && currentRank !== null && currentRank < this.previousRank;
       this.previousRank = currentRank;
+
+      const topLimit = 20;
+      const topSlice = displayList.slice(0, topLimit);
+      const isUserInTopSlice = currentUser && topSlice.some(p =>
+        (p.id && currentUser.id && p.id === currentUser.id) ||
+        (p.name && currentUser.username && p.name.toLowerCase() === currentUser.username.toLowerCase())
+      );
 
       let html = `
         <div class="ranking-header">
@@ -69,7 +119,7 @@
         <div class="ranking-list">
       `;
 
-      if (!list || list.length === 0) {
+      if (!displayList || displayList.length === 0) {
         html += `
           <div class="ranking-empty-state">
             <span class="ranking-empty-icon">🎮</span>
@@ -79,7 +129,7 @@
           </div>
         `;
       } else {
-        list.slice(0, 15).forEach((player, idx) => {
+        topSlice.forEach((player, idx) => {
           const pos = idx + 1;
           let medal = `<span class="pos-num">${pos}º</span>`;
           let posClass = '';
@@ -102,31 +152,16 @@
 
           const highlightClass = isCurrent ? 'current-player-row' : '';
           const cleanName = this.escapeHtml(player.name);
-          const cleanAvatar = this.escapeHtml(player.avatar || '👤');
-          let avatarDisplay = cleanAvatar;
-          if (player.avatar && (
-                player.avatar.startsWith('http://') ||
-                player.avatar.startsWith('https://')
-            )) {
-                const safeUrl = encodeURIComponent(player.avatar);
+          const avatarDisplay = this.getAvatarMarkup(player.avatar);
 
-                avatarDisplay = `
-                    <img
-                        src="/api/avatar?url=${safeUrl}"
-                        alt="Avatar"
-                        style="
-                            width:100%;
-                            height:100%;
-                            border-radius:50%;
-                            object-fit:cover;
-                            display:block;
-                        "
-                        onerror="this.onerror=null;this.style.display='none';this.parentElement.textContent='👤';"
-                    >
-                `;
-            }
-          const cleanWin = parseInt(player.highestWin, 10) || 0;
-          const cleanBalance = parseInt(player.balance, 10) || 0;
+          // Garante que o saldo do jogador atual no ranking seja estritamente igual ao do topo
+          const cleanBalance = (isCurrent && currentUser && currentUser.balance !== undefined)
+            ? Math.max(0, parseInt(currentUser.balance, 10))
+            : Math.max(0, parseInt(player.balance, 10) || 0);
+
+          const cleanWin = (isCurrent && currentUser && currentUser.highestWin !== undefined)
+            ? Math.max(parseInt(player.highestWin, 10) || 0, parseInt(currentUser.highestWin, 10) || 0)
+            : Math.max(0, parseInt(player.highestWin, 10) || 0);
 
           html += `
             <div class="ranking-item ${posClass} ${highlightClass}" data-rank="${pos}">
@@ -137,11 +172,11 @@
                   ${cleanName}
                   ${isCurrent ? '<span class="you-tag">VOCÊ</span>' : ''}
                 </div>
-                <div class="player-record">Melhor Vitória: ⚡ ${cleanWin.toLocaleString('pt-BR')}</div>
+                <div class="player-record">Melhor Vitória: <strong>⚡ ${cleanWin.toLocaleString('pt-BR')}</strong></div>
               </div>
               <div class="player-score">
                 <span class="coin-val">${cleanBalance.toLocaleString('pt-BR')}</span>
-                <span class="coin-unit">pts</span>
+                <span class="coin-unit">moedas</span>
               </div>
             </div>
           `;
@@ -149,6 +184,34 @@
       }
 
       html += `</div>`;
+
+      // Se o jogador estiver conectado mas não estiver no top exibido, fixa cartão especial dele no rodapé
+      if (currentUser && !isUserInTopSlice && currentRank) {
+        const userCleanName = this.escapeHtml(currentUser.displayName || currentUser.username);
+        const userAvatar = this.getAvatarMarkup(currentUser.avatar);
+        const userBal = Math.max(0, parseInt(currentUser.balance, 10) || 0);
+        const userWin = Math.max(0, parseInt(currentUser.highestWin, 10) || 0);
+
+        html += `
+          <div class="ranking-user-pinned">
+            <div class="ranking-item current-player-row is-pinned" data-rank="${currentRank}">
+              <div class="rank-position"><span class="pos-num">${currentRank}º</span></div>
+              <div class="player-avatar">${userAvatar}</div>
+              <div class="player-info">
+                <div class="player-name">
+                  ${userCleanName}
+                  <span class="you-tag">VOCÊ</span>
+                </div>
+                <div class="player-record">Melhor Vitória: <strong>⚡ ${userWin.toLocaleString('pt-BR')}</strong></div>
+              </div>
+              <div class="player-score">
+                <span class="coin-val">${userBal.toLocaleString('pt-BR')}</span>
+                <span class="coin-unit">moedas</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }
 
       this.container.innerHTML = html;
 
@@ -165,6 +228,22 @@
           setTimeout(() => currentElem.classList.remove('rank-up-glow'), 2500);
         }
       }
+    }
+
+    getAvatarMarkup(avatar) {
+      const clean = this.escapeHtml(avatar || '👤');
+      if (avatar && (avatar.startsWith('http://') || avatar.startsWith('https://'))) {
+        const safeUrl = encodeURIComponent(avatar);
+        return `
+          <img
+            src="/api/avatar?url=${safeUrl}"
+            alt="Avatar"
+            style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;"
+            onerror="this.onerror=null;this.style.display='none';this.parentElement.textContent='👤';"
+          >
+        `;
+      }
+      return clean;
     }
 
     escapeHtml(str) {

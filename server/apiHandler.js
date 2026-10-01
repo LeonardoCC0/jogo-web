@@ -569,8 +569,8 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
     }
 
     const betAmount = parseInt(payload.bet, 10);
-    if (isNaN(betAmount) || betAmount < 5 || betAmount > 1000) {
-      return json(400, { error: 'Valor de aposta inválido (mínimo 5, máximo 1.000).' });
+    if (isNaN(betAmount) || betAmount < 5) {
+      return json(400, { error: 'Valor de aposta inválido (mínimo 5 moedas).' });
     }
 
     if (user.balance < betAmount) {
@@ -651,6 +651,9 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
 
   // 7. RANKING GLOBAL 100% REAL (SEM BOTS)
   if (pathname === '/api/leaderboard' && method === 'GET') {
+    if (res && res.setHeader) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    }
     const usersList = Object.values(db.users || {});
 
     const leaderboard = usersList.map(u => ({
@@ -664,13 +667,13 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
 
     leaderboard.sort((a, b) => {
         if (b.balance !== a.balance) return b.balance - a.balance;
-        return b.highestWin - a.highestWin;
+        return (b.highestWin || 0) - (a.highestWin || 0);
     });
 
     return json(200, {
         success: true,
         totalPlayers: leaderboard.length,
-        leaderboard: leaderboard.slice(0, 15)
+        leaderboard: leaderboard.slice(0, 30)
     });
   }
 

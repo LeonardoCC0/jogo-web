@@ -30,6 +30,7 @@
       this.autoSpinTimer = null;
       this.slotMachine = null;
       this.lastSpinTime = 0;
+      this.balanceAnimId = null;
 
       this.currentUser = null;
       this.authToken = storage.getAuthToken();
@@ -54,9 +55,13 @@
       // Verifica sessão do usuário logado
       await this.checkAuthSession();
 
-      // Primeiro acesso sem login
-      if (storage.isFirstVisit() && !this.currentUser) {
-        this.showWelcomeModal();
+      // No exato momento que entra no jogo, se não estiver logado, abre a tela de autenticação
+      if (!this.currentUser) {
+        this.openAuthModal('login');
+      }
+
+      if (typeof window.renderGoogleButtons === 'function') {
+        window.renderGoogleButtons();
       }
     }
 
@@ -288,6 +293,9 @@
       this.clearAuthMessages();
       this.setAuthMode(mode);
       this.openModal(this.dom.authModal);
+      if (typeof window.renderGoogleButtons === 'function') {
+        window.renderGoogleButtons();
+      }
     }
 
     setAuthMode(mode) {
@@ -586,11 +594,11 @@
         this.setBet(this.currentBet + 5);
       });
 
-      // Aposta Máxima
+      // Aposta Máxima: todo o dinheiro que a pessoa tem no momento
       this.dom.btnMaxBet.addEventListener('click', () => {
         audioSystem.playClick();
-        const maxPossible = Math.min(window.CONFIG.MAX_BET, this.balance > 0 ? this.balance : window.CONFIG.MAX_BET);
-        this.setBet(maxPossible);
+        const allMoney = this.balance > 0 ? this.balance : window.CONFIG.MIN_BET;
+        this.setBet(allMoney);
       });
 
       // Modo Turbo
@@ -670,7 +678,8 @@
     }
 
     setBet(newBet) {
-      const clamped = Math.max(window.CONFIG.MIN_BET, Math.min(window.CONFIG.MAX_BET, newBet));
+      const maxLimit = Math.max(window.CONFIG.MIN_BET, this.balance > 0 ? this.balance : window.CONFIG.MIN_BET);
+      const clamped = Math.max(window.CONFIG.MIN_BET, Math.min(maxLimit, newBet));
       this.currentBet = clamped;
       this.dom.betDisplay.textContent = this.currentBet.toLocaleString('pt-BR');
 
@@ -759,7 +768,8 @@
     }
 
     handleSpinStart(betAmount) {
-      this.animateBalanceChange(-betAmount);
+      const targetAfterBet = Math.max(0, this.balance - betAmount);
+      this.animateBalance(this.balance, targetAfterBet);
     }
 
     handleSpinComplete(outcome) {
@@ -768,24 +778,25 @@
 
       storage.recordSpin(outcome.isWin);
 
-      // Sincroniza saldo e recorde reais confirmados pelo servidor
-      if (outcome.newBalance !== undefined) {
-        this.balance = outcome.newBalance;
-        if (this.currentUser) {
-          this.currentUser.balance = outcome.newBalance;
-          if (outcome.highestWin !== undefined) {
-            this.currentUser.highestWin = outcome.highestWin;
-          }
-          storage.setUserData(this.currentUser);
-        }
+      // Saldo autoritativo definitivo do servidor
+      const targetBalance = (outcome.newBalance !== undefined)
+        ? outcome.newBalance
+        : Math.max(0, this.balance + (outcome.isWin ? (outcome.winAmount || 0) : 0));
+
+      if (outcome.highestWin !== undefined && this.currentUser) {
+        this.currentUser.highestWin = outcome.highestWin;
+        storage.setHighestWin(outcome.highestWin);
       }
 
       if (outcome.isWin && outcome.winAmount > 0) {
         this.slotMachine.highlightWin();
         this.dom.slotMachineWrapper.classList.add('machine-winning');
-        this.animateBalanceChange(outcome.winAmount);
 
-        if (outcome.highestWin) {
+        // Animação de ganho: parte do saldo pré-ganho até o targetBalance definitivo (sem soma dupla!)
+        const startVal = Math.max(0, targetBalance - outcome.winAmount);
+        this.animateBalance(startVal, targetBalance);
+
+        if (outcome.highestWin && this.dom.bestWinText) {
           this.dom.bestWinText.textContent = outcome.highestWin.toLocaleString('pt-BR');
         }
 
@@ -798,6 +809,16 @@
         }
       } else {
         this.dom.winDisplay.classList.remove('show');
+        // Em caso de não vitória, sincroniza diretamente o saldo final do servidor
+        this.animateBalance(this.balance, targetBalance);
+      }
+
+      // Garante sincronização estrita em memória e localStorage
+      this.balance = targetBalance;
+      if (this.currentUser) {
+        this.currentUser.balance = targetBalance;
+        this.currentUser.score = targetBalance;
+        storage.setUserData(this.currentUser);
       }
 
       // Registra no histórico
@@ -811,7 +832,7 @@
       storage.addHistoryEntry(historyEntry);
       this.renderHistory();
 
-      // Atualiza Ranking Global Real
+      // Atualiza Ranking Global Real sincronizado com o saldo exato do usuário
       rankingSystem.fetchAndUpdate(this.currentUser);
 
       // Zerou as moedas? Bloqueia o jogo e força o reset por punição (500 moedas)
@@ -858,10 +879,29 @@
       audioSystem.playCoinChime();
     }
 
-    animateBalanceChange(diff) {
-      const startVal = this.balance;
-      const endVal = Math.max(0, startVal + diff);
+    animateBalance(fromVal, toVal) {
+      if (this.balanceAnimId) {
+        cancelAnimationFrame(this.balanceAnimId);
+        this.balanceAnimId = null;
+      }
+
+      const startVal = Math.max(0, parseInt(fromVal, 10) || 0);
+      const endVal = Math.max(0, parseInt(toVal, 10) || 0);
       this.balance = endVal;
+
+      if (this.currentUser) {
+        this.currentUser.balance = endVal;
+        this.currentUser.score = endVal;
+        storage.setUserData(this.currentUser);
+      }
+
+      const diff = endVal - startVal;
+      if (diff === 0) {
+        if (this.dom.balanceText) {
+          this.dom.balanceText.textContent = endVal.toLocaleString('pt-BR');
+        }
+        return;
+      }
 
       const duration = 600;
       const startTime = performance.now();
@@ -871,18 +911,25 @@
         const easeProgress = 1 - Math.pow(1 - progress, 3);
         const currentVal = Math.round(startVal + (diff * easeProgress));
 
-        this.dom.balanceText.textContent = currentVal.toLocaleString('pt-BR');
+        if (this.dom.balanceText) {
+          this.dom.balanceText.textContent = currentVal.toLocaleString('pt-BR');
+        }
 
         if (progress < 1) {
-          requestAnimationFrame(step);
+          this.balanceAnimId = requestAnimationFrame(step);
         } else {
-          this.dom.balanceText.textContent = endVal.toLocaleString('pt-BR');
-          this.dom.balanceText.classList.add('balance-pulse');
-          setTimeout(() => this.dom.balanceText.classList.remove('balance-pulse'), 300);
+          if (this.dom.balanceText) {
+            this.dom.balanceText.textContent = endVal.toLocaleString('pt-BR');
+            this.dom.balanceText.classList.add('balance-pulse');
+            setTimeout(() => {
+              if (this.dom.balanceText) this.dom.balanceText.classList.remove('balance-pulse');
+            }, 300);
+          }
+          this.balanceAnimId = null;
         }
       };
 
-      requestAnimationFrame(step);
+      this.balanceAnimId = requestAnimationFrame(step);
     }
 
     // Verifica se o saldo zerou e força o modal de "Fim de Jogo"
@@ -1069,6 +1116,9 @@
 
     showWelcomeModal() {
       this.openModal(this.dom.welcomeModal);
+      if (typeof window.renderGoogleButtons === 'function') {
+        window.renderGoogleButtons();
+      }
     }
 
     showToast(message, duration = 3000) {
@@ -1146,3 +1196,54 @@ async function handleGoogleLogin(response) {
 }
 
 window.handleGoogleLogin = handleGoogleLogin;
+
+function renderGoogleButtons() {
+  if (window.google && window.google.accounts && window.google.accounts.id) {
+    try {
+      window.google.accounts.id.initialize({
+        client_id: '701601557497-m4m4geq1p3oj242pnvqvg11eeld6jd1s.apps.googleusercontent.com',
+        callback: window.handleGoogleLogin
+      });
+
+      const modalWrap = document.getElementById('google-login-modal-wrap');
+      if (modalWrap) {
+        modalWrap.innerHTML = '';
+        window.google.accounts.id.renderButton(modalWrap, {
+          type: 'standard',
+          shape: 'pill',
+          theme: 'filled_black',
+          text: 'continue_with',
+          size: 'large',
+          logo_alignment: 'left',
+          width: 280
+        });
+      }
+
+      const welcomeWrap = document.getElementById('google-login-welcome-wrap');
+      if (welcomeWrap) {
+        welcomeWrap.innerHTML = '';
+        window.google.accounts.id.renderButton(welcomeWrap, {
+          type: 'standard',
+          shape: 'pill',
+          theme: 'filled_black',
+          text: 'continue_with',
+          size: 'large',
+          logo_alignment: 'left',
+          width: 280
+        });
+      }
+    } catch (e) {
+      console.warn('Erro ao renderizar botões Google:', e);
+    }
+  }
+}
+
+window.renderGoogleButtons = renderGoogleButtons;
+
+window.addEventListener('load', () => {
+  if (typeof window.renderGoogleButtons === 'function') {
+    window.renderGoogleButtons();
+    setTimeout(window.renderGoogleButtons, 400);
+    setTimeout(window.renderGoogleButtons, 1200);
+  }
+});
