@@ -205,6 +205,80 @@ function sanitizeUser(user) {
 }
 
 async function handleApiRequest(req, res, pathname, method, payload = {}) {
+
+  // Proxy seguro para fotos de perfil do Google
+  if (pathname === '/api/avatar' && method === 'GET') {
+    try {
+      const requestUrl = new URL(
+        req.url,
+        `http://${req.headers.host || 'localhost'}`
+      );
+
+      const avatarUrl = requestUrl.searchParams.get('url');
+
+      if (!avatarUrl) {
+        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('URL do avatar não fornecida');
+        return;
+      }
+
+      const parsedAvatarUrl = new URL(avatarUrl);
+
+      // Permite somente imagens hospedadas pelo Google
+      const allowedHosts = [
+        'lh3.googleusercontent.com',
+        'lh4.googleusercontent.com',
+        'lh5.googleusercontent.com',
+        'lh6.googleusercontent.com'
+      ];
+
+      if (
+        parsedAvatarUrl.protocol !== 'https:' ||
+        !allowedHosts.includes(parsedAvatarUrl.hostname)
+      ) {
+        res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Fonte de avatar não permitida');
+        return;
+      }
+
+      const response = await fetch(parsedAvatarUrl.href);
+
+      if (!response.ok) {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Avatar não encontrado');
+        return;
+      }
+
+      const contentType = response.headers.get('content-type') || 'image/jpeg';
+
+      if (!contentType.startsWith('image/')) {
+        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Arquivo de avatar inválido');
+        return;
+      }
+
+      const imageBuffer = Buffer.from(await response.arrayBuffer());
+
+      res.writeHead(200, {
+        'Content-Type': contentType,
+        'Cache-Control': 'public, max-age=86400'
+      });
+
+      res.end(imageBuffer);
+      return;
+
+    } catch (error) {
+      console.error('Erro ao carregar avatar do Google:', error);
+
+      res.writeHead(500, {
+        'Content-Type': 'text/plain; charset=utf-8'
+      });
+
+      res.end('Erro ao carregar avatar');
+      return;
+    }
+  }
+
   const json = (statusCode, data) => {
     res.writeHead(statusCode, {
       'Content-Type': 'application/json',

@@ -105,20 +105,26 @@
           const cleanAvatar = this.escapeHtml(player.avatar || '👤');
           let avatarDisplay = cleanAvatar;
           if (player.avatar && (
-            player.avatar.startsWith('http://') ||
-            player.avatar.startsWith('https://')
-          )) {
-          const safeUrl = this.escapeHtml(player.avatar);
+                player.avatar.startsWith('http://') ||
+                player.avatar.startsWith('https://')
+            )) {
+                const safeUrl = encodeURIComponent(player.avatar);
 
-            avatarDisplay = `
-                <img
-                    src="${safeUrl}"
-                    alt="Avatar"
-                    style="width:100%;height:100%;border-radius:50%;object-fit:cover;"
-                    onerror="this.style.display='none';this.parentElement.textContent='👤';"
-                >
-            `;
-        }
+                avatarDisplay = `
+                    <img
+                        src="/api/avatar?url=${safeUrl}"
+                        alt="Avatar"
+                        style="
+                            width:100%;
+                            height:100%;
+                            border-radius:50%;
+                            object-fit:cover;
+                            display:block;
+                        "
+                        onerror="this.onerror=null;this.style.display='none';this.parentElement.textContent='👤';"
+                    >
+                `;
+            }
           const cleanWin = parseInt(player.highestWin, 10) || 0;
           const cleanBalance = parseInt(player.balance, 10) || 0;
 
