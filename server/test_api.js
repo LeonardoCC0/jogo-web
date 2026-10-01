@@ -6,11 +6,6 @@ const path = require('path');
 const assert = require('node:assert/strict');
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'cyber-security-'));
 process.env.TEST_DB_FILE = path.join(temp, 'db.json');
-delete process.env.FOUNDER_USER_ID;
-delete process.env.KV_REST_API_URL;
-delete process.env.KV_REST_API_TOKEN;
-delete process.env.UPSTASH_REDIS_REST_URL;
-delete process.env.UPSTASH_REDIS_REST_TOKEN;
 const { OAuth2Client } = require('google-auth-library');
 const googlePayloads = new Map();
 OAuth2Client.prototype.verifyIdToken = async function ({ idToken }) {

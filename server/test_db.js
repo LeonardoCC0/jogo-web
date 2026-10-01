@@ -17,11 +17,6 @@ async function fakeFetch(url, options) {
   }
   return { ok: true, json: async () => ({ result }) };
 }
-function instance() {
-  const sandbox = { require, __dirname, module: { exports: {} }, process: { env: { KV_REST_API_URL: 'https://redis.test', KV_REST_API_TOKEN: 'test' } }, fetch: fakeFetch, AbortSignal };
-  vm.runInNewContext(fs.readFileSync(require('path').join(__dirname, 'db.js'), 'utf8'), sandbox);
-  return sandbox.module.exports;
-}
 async function run() {
   const a = instance(), b = instance();
   async function increment(db) {
