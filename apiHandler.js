@@ -227,12 +227,11 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
   }
 
   const db = await Database.get();
-
   // Garante a estrutura mínima do banco antes de qualquer rota.
-  // Isso evita erros quando uma base antiga não possui alguma coleção.
-  if (!db.users || typeof db.users !== 'object' || Array.isArray(db.users)) db.users = {};
-  if (!db.sessions || typeof db.sessions !== 'object' || Array.isArray(db.sessions)) db.sessions = {};
-
+  db.users ||= {};
+  db.sessions ||= {};
+  db.history ||= [];
+  db.admin_logs ||= [];
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return json(400, { error: 'Corpo inválido.' });
   if (method !== 'GET' && req.headers?.origin) {
     try { if (new URL(req.headers.origin).host !== req.headers.host) return json(403, { error: 'Origem não autorizada.' }); }
@@ -388,27 +387,34 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
     const googleSub = String(gPayload.sub);
     const googleEmail = String(gPayload.email || '').toLowerCase().trim();
     const googleName = String(gPayload.name || gPayload.given_name || '').trim();
-    const googleAvatar = gPayload.picture || '⚡';
+    const googleAvatar = typeof gPayload.picture === 'string' && /^https:\/\//.test(gPayload.picture)
+      ? gPayload.picture
+      : '⚡';
 
     // 1. Identificar usuário pelo Google sub (ID único do Google).
-    // O filtro ignora entradas inválidas para não quebrar um login novo.
-    let user = Object.values(db.users).find(
-      u => u && String(u.googleId || '') === googleSub
+    // Filtra entradas inválidas para impedir que um registro quebrado do db.json
+    // interrompa o login de uma conta nova.
+    let user = Object.values(db.users).find(u =>
+      u && typeof u === 'object' && String(u.googleId || '') === googleSub
     );
 
-    // 2. Se não encontrou por googleId, verificar se já existe conta pelo email para vincular.
+    // 2. Se não encontrou por googleId, verificar se já existe conta pelo email.
     if (!user && googleEmail) {
-      const existing = Object.values(db.users).find(
-        u => u && typeof u.email === 'string' && u.email.toLowerCase() === googleEmail
+      const existing = Object.values(db.users).find(u =>
+        u && typeof u === 'object' && String(u.email || '').toLowerCase() === googleEmail
       );
 
       if (existing) {
+        // Se a conta já existe por senha, não sobrescreva nem crie outra conta.
+        // Só vincula automaticamente quando ela já estiver autenticada.
         const auth = requireAuth(req, {}, db);
         if (auth.error || auth.user.id !== existing.id) {
-          return json(409, { error: 'Entre na conta existente antes de vincular o Google.' });
+          return json(409, {
+            error: 'Este e-mail já possui uma conta. Entre nela primeiro para vincular o Google.'
+          });
         }
         if (existing.googleId && existing.googleId !== googleSub) {
-          return json(409, { error: 'Conta já vinculada a outro Google.' });
+          return json(409, { error: 'Esta conta já está vinculada a outro Google.' });
         }
         user = existing;
         user.googleId = googleSub;
@@ -418,14 +424,9 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
     // 3. Se ainda não existir, criar a conta automaticamente.
     if (!user) {
       const userId = 'u_g_' + crypto.randomUUID();
-      let baseUsername = (
-        gPayload.given_name ||
-        googleName ||
-        (googleEmail ? googleEmail.split('@')[0] : '')
-      )
+      let baseUsername = (gPayload.given_name || googleName || (googleEmail ? googleEmail.split('@')[0] : ''))
         .replace(/[^a-zA-Z0-9_-]/g, '')
         .slice(0, 12);
-
       if (!baseUsername || baseUsername.length < 3) {
         baseUsername = 'player';
       }
@@ -437,6 +438,8 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
         counter++;
       }
 
+      const isFounder = false;
+
       user = {
         id: userId,
         googleId: googleSub,
@@ -444,12 +447,10 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
         email: googleEmail,
         username: candidateKey,
         displayName: cleanString(googleName, 16) || candidateKey,
-        avatar: typeof googleAvatar === 'string' && /^https:\/\//.test(googleAvatar)
-          ? googleAvatar
-          : '⚡',
-        role: 'user',
+        avatar: googleAvatar,
+        role: isFounder ? 'founder' : 'user',
         isBanned: false,
-        balance: 1000,
+        balance: 1000, // Saldo inicial concedido uma única vez
         highestWin: 0,
         score: 1000,
         createdAt: Date.now(),
@@ -458,14 +459,16 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
 
       db.users[candidateKey] = user;
     } else {
-      // Usuário existente: não resetar saldo, ganhos ou score.
+      // Usuário existente: preservar saldo, score e maior vitória.
       ensureFounderRole(user);
       user.updatedAt = Date.now();
     }
 
-    // Proteção adicional: nunca tente escrever em avatar de um usuário inexistente.
-    if (!user || typeof user !== 'object') {
-      console.error('Falha no login Google: usuário não foi criado/localizado.', {
+    // Defesa final: o fluxo acima sempre deve produzir um usuário.
+    // Se o db.json estiver inconsistente, retorne um erro explicativo em vez
+    // de gerar TypeError em user.avatar.
+    if (!user || typeof user !== 'object' || !user.id || !user.username) {
+      console.error('Google login: usuário não pôde ser localizado/criado.', {
         googleSub,
         googleEmail
       });
@@ -478,17 +481,13 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
       });
     }
 
-    // Atualiza o avatar somente depois de garantir que o objeto user existe.
-    if (typeof googleAvatar === 'string' && /^https:\/\//.test(googleAvatar)) {
-      user.avatar = googleAvatar;
-    } else if (!user.avatar) {
-      user.avatar = '⚡';
-    }
+    user.avatar = googleAvatar;
+
     // Para domínio externo, Google só é autoridade quando há Workspace (hd).
     if (!db.founderId && googleEmail === FOUNDER_EMAIL && gPayload.hd === 'raphaeldisanto.com.br') {
       db.founderId = user.id;
-      const founderStore = founderContext.getStore();
-      if (founderStore) founderStore.founderId = user.id;
+      const context = founderContext.getStore();
+      if (context) context.founderId = user.id;
       for (const [key, session] of Object.entries(db.sessions)) if (session.userId === user.id) delete db.sessions[key];
     }
     ensureFounderRole(user);
