@@ -1,10 +1,10 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>CYBER NEON SLOTS - Jogo CaÃ§a-NÃ­quel Virtual</title>
-  <meta name="description" content="Jogo de caÃ§a-nÃ­queis virtual moderno em tela Ãºnica com ranking global, efeitos neon, fÃ­sica suave e moedas 100% virtuais sem valor monetÃ¡rio.">
+  <title>CYBER NEON SLOTS - Jogo Caça-Níquel Virtual</title>
+  <meta name="description" content="Jogo de caça-níqueis virtual moderno em tela única com ranking global, efeitos neon, física suave e moedas 100% virtuais sem valor monetário.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -17,30 +17,30 @@
 </head>
 <body>
 
-  <!-- Canvas para Chuva de Confetes e PartÃ­culas de VitÃ³ria -->
+  <!-- Canvas para Chuva de Confetes e Partículas de Vitória -->
   <canvas id="particle-canvas"></canvas>
 
   <!-- Topo / Barra Superior -->
   <header class="game-header">
     <div class="header-left">
       <div class="logo-wrapper">
-        <span class="logo-icon">ðŸŽ°</span>
+        <span class="logo-icon">🎰</span>
         <div class="logo-text-group">
           <h1 class="game-logo">CYBER<span>SLOTS</span></h1>
-          <span class="logo-sub">NEON ARCADE â€¢ 100% VIRTUAL</span>
+          <span class="logo-sub">NEON ARCADE • 100% VIRTUAL</span>
         </div>
       </div>
-      <div class="disclaimer-badge" title="Este jogo utiliza apenas pontos virtuais sem valor monetÃ¡rio real">
+      <div class="disclaimer-badge" title="Este jogo utiliza apenas pontos virtuais sem valor monetário real">
         <span class="badge-dot"></span>
-        <span>Apenas Moedas Virtuais â€¢ Sem Dinheiro Real</span>
+        <span>Apenas Moedas Virtuais • Sem Dinheiro Real</span>
       </div>
     </div>
 
     <div class="header-center">
-      <!-- CartÃ£o de Saldo do Jogador (Sem Recarga) -->
+      <!-- Cartão de Saldo do Jogador (Sem Recarga) -->
       <div class="balance-card">
         <div class="balance-icon-wrap">
-          <span class="coin-gem">ðŸª™</span>
+          <span class="coin-gem">🪙</span>
         </div>
         <div class="balance-info">
           <span class="balance-label">SALDO VIRTUAL</span>
@@ -53,7 +53,7 @@
     </div>
 
     <div class="header-right">
-      <!-- BotÃ£o do Google Login -->
+      <!-- Botão do Google Login -->
       <div id="google-login-wrapper" class="google-login-header-wrap" title="Entrar com sua conta Google">
         <div id="g_id_onload"
             data-client_id="701601557497-m4m4geq1p3oj242pnvqvg11eeld6jd1s.apps.googleusercontent.com"
@@ -62,59 +62,59 @@
         <div class="g_id_signin" data-type="standard" data-shape="pill" data-theme="filled_black" data-text="signin_with" data-size="medium" data-logo_alignment="left"></div>
       </div>
 
-      <!-- BotÃ£o para Entrar/Cadastrar quando deslogado -->
-      <button id="btn-open-auth" class="btn-auth-header" title="Entrar ou criar conta para salvar pontuaÃ§Ã£o">
-        <span>ðŸ”‘ Entrar / Cadastrar</span>
+      <!-- Botão para Entrar/Cadastrar quando deslogado -->
+      <button id="btn-open-auth" class="btn-auth-header" title="Entrar ou criar conta para salvar pontuação">
+        <span>🔑 Entrar / Cadastrar</span>
       </button>
 
-      <!-- BotÃ£o de AdministraÃ§Ã£o (exibido apenas para admin ou founder) -->
+      <!-- Botão de Administração (exibido apenas para admin ou founder) -->
       <a id="btn-admin-panel" href="/admin" class="btn-admin-header hidden" title="Acessar Painel de Controle">
-        <span class="btn-admin-icon">âš™</span>
-        <span class="btn-admin-text">AdministraÃ§Ã£o</span>
+        <span class="btn-admin-icon">⚙</span>
+        <span class="btn-admin-text">Administração</span>
       </a>
 
-      <!-- BotÃ£o de Reset VoluntÃ¡rio -->
+      <!-- Botão de Reset Voluntário -->
       <button id="btn-reset-voluntary" class="btn-reset-voluntary" title="Resetar progresso para 1.000 moedas">
-        <span class="btn-reset-icon">ðŸ”„</span>
+        <span class="btn-reset-icon">🔄</span>
         <span class="btn-reset-text">Resetar Saldo</span>
       </button>
 
       <!-- Card do Perfil do Jogador (quando logado) -->
       <div id="player-profile" class="player-profile-chip hidden" role="button" tabindex="0" title="Editar seu nome no ranking" aria-label="Editar perfil">
-        <div id="player-avatar-icon" class="profile-avatar">âš¡</div>
+        <div id="player-avatar-icon" class="profile-avatar">⚡</div>
         <div class="profile-meta">
           <span id="player-name-text" class="profile-name">CyberPlayer</span>
           <span class="profile-record">Recorde: <strong id="best-win-text">0</strong></span>
         </div>
       </div>
 
-      <!-- BotÃ£o de Sair (Logout) -->
+      <!-- Botão de Sair (Logout) -->
       <button id="btn-logout" class="btn-icon btn-logout hidden" title="Sair da Conta" aria-label="Sair">
-        <span>ðŸšª</span>
+        <span>🚪</span>
       </button>
 
-      <!-- BotÃµes de AÃ§Ã£o do Topo -->
+      <!-- Botões de Ação do Topo -->
       <div class="header-actions">
         <button id="btn-sound" class="btn-icon" title="Ativar/Desativar Som" aria-label="Som">
-          <span id="sound-icon">ðŸ”Š</span>
+          <span id="sound-icon">🔊</span>
         </button>
-        <button id="btn-paytable" class="btn-icon" title="Tabela de PrÃªmios e Regras" aria-label="Tabela de PrÃªmios">
-          <span>â„¹ï¸</span>
+        <button id="btn-paytable" class="btn-icon" title="Tabela de Prêmios e Regras" aria-label="Tabela de Prêmios">
+          <span>ℹ️</span>
         </button>
       </div>
     </div>
   </header>
 
-  <!-- Abas para telas mÃ³veis (Smartphones e Tablets pequenos) -->
+  <!-- Abas para telas móveis (Smartphones e Tablets pequenos) -->
   <nav class="mobile-tabs-nav">
     <button class="mobile-tab-btn active" data-tab="tab-machine">
-      <span>ðŸŽ°</span> MÃ¡quina
+      <span>🎰</span> Máquina
     </button>
     <button class="mobile-tab-btn" data-tab="tab-leaderboard">
-      <span>ðŸ†</span> Ranking
+      <span>🏆</span> Ranking
     </button>
     <button class="mobile-tab-btn" data-tab="tab-history">
-      <span>ðŸ“œ</span> HistÃ³rico
+      <span>📜</span> Histórico
     </button>
   </nav>
 
@@ -128,22 +128,22 @@
       </div>
     </aside>
 
-    <!-- Coluna Central: MÃ¡quina CaÃ§a-NÃ­quel & Console de Apostas -->
+    <!-- Coluna Central: Máquina Caça-Níquel & Console de Apostas -->
     <section id="tab-machine" class="center-stage tab-content-panel active">
       <div id="slot-machine-wrapper" class="slot-machine-wrapper">
         
-        <!-- Topo da MÃ¡quina (Marquee com LEDs) -->
+        <!-- Topo da Máquina (Marquee com LEDs) -->
         <div class="machine-header">
           <div class="led-strip led-left"></div>
           <div class="machine-title-badge">
-            <span class="title-sparkle">âœ¦</span>
+            <span class="title-sparkle">✦</span>
             <span>CYBER JACKPOT</span>
-            <span class="title-sparkle">âœ¦</span>
+            <span class="title-sparkle">✦</span>
           </div>
           <div class="led-strip led-right"></div>
         </div>
 
-        <!-- Janela dos Rolos da MÃ¡quina (Reels Window) -->
+        <!-- Janela dos Rolos da Máquina (Reels Window) -->
         <div class="reels-window-frame">
           <div class="payline-laser" title="Linha de Pagamento Central">
             <div class="laser-beam"></div>
@@ -177,40 +177,40 @@
           </div>
         </div>
 
-        <!-- Banner de NotificaÃ§Ã£o de VitÃ³ria (aparece quando ganha) -->
+        <!-- Banner de Notificação de Vitória (aparece quando ganha) -->
         <div id="win-display" class="win-display">
           <div class="win-glow-backdrop"></div>
           <div class="win-content">
             <div class="win-title-row">
-              <span class="win-sparkle">âœ¨</span>
+              <span class="win-sparkle">✨</span>
               <span id="win-amount-text" class="win-amount">+500 moedas</span>
-              <span class="win-sparkle">âœ¨</span>
+              <span class="win-sparkle">✨</span>
             </div>
-            <div id="win-multiplier-text" class="win-multiplier">10x â€¢ VITÃ“RIA!</div>
+            <div id="win-multiplier-text" class="win-multiplier">10x • VITÓRIA!</div>
           </div>
         </div>
 
-        <!-- Painel de Controle de Apostas & AÃ§Ãµes -->
+        <!-- Painel de Controle de Apostas & Ações -->
         <div class="machine-control-deck">
           
           <!-- Seletor de Valor de Aposta -->
           <div class="bet-control-group">
             <div class="bet-label-row">
               <span class="control-label">VALOR DA APOSTA VIRTUAL</span>
-              <span class="control-hint">MÃ­n: 5 â€¢ MÃ¡x: seu saldo</span>
+              <span class="control-hint">Mín: 5 • Máx: seu saldo</span>
             </div>
             
             <div class="bet-input-box">
               <button id="btn-bet-minus" class="btn-bet-step" title="Diminuir aposta em 5" aria-label="Diminuir aposta">-</button>
               <div class="bet-value-display">
-                <span class="bet-currency-icon">ðŸª™</span>
+                <span class="bet-currency-icon">🪙</span>
                 <span id="bet-display" class="bet-amount">25</span>
               </div>
               <button id="btn-bet-plus" class="btn-bet-step" title="Aumentar aposta em 5" aria-label="Aumentar aposta">+</button>
-              <button id="btn-max-bet" class="btn-max" title="Apostar todo o saldo atual">MÃX</button>
+              <button id="btn-max-bet" class="btn-max" title="Apostar todo o saldo atual">MÁX</button>
             </div>
 
-            <!-- Fichas RÃ¡pidas de Aposta -->
+            <!-- Fichas Rápidas de Aposta -->
             <div class="quick-chips-row">
               <button class="chip-btn" data-bet="10">10</button>
               <button class="chip-btn chip-active" data-bet="25">25</button>
@@ -221,26 +221,26 @@
             </div>
           </div>
 
-          <!-- BotÃµes de AÃ§Ã£o Principais -->
+          <!-- Botões de Ação Principais -->
           <div class="action-buttons-group">
             
             <div class="modifier-buttons">
-              <button id="btn-turbo" class="btn-modifier" title="Giro rÃ¡pido e instantÃ¢neo">
-                <span class="mod-icon">âš¡</span>
+              <button id="btn-turbo" class="btn-modifier" title="Giro rápido e instantâneo">
+                <span class="mod-icon">⚡</span>
                 <span class="mod-text">TURBO</span>
               </button>
-              <button id="btn-auto-spin" class="btn-modifier" title="Giro automÃ¡tico contÃ­nuo">
-                <span class="mod-icon">ðŸ”„</span>
+              <button id="btn-auto-spin" class="btn-modifier" title="Giro automático contínuo">
+                <span class="mod-icon">🔄</span>
                 <span class="mod-text">AUTO</span>
               </button>
             </div>
 
-            <!-- O Grande BotÃ£o GIRAR -->
-            <button id="btn-spin" class="btn-spin" title="Clique ou pressione ESPAÃ‡O para girar">
+            <!-- O Grande Botão GIRAR -->
+            <button id="btn-spin" class="btn-spin" title="Clique ou pressione ESPAÇO para girar">
               <div class="spin-btn-glow"></div>
               <div class="spin-btn-inner">
                 <span class="spin-main-text">GIRAR</span>
-                <span class="spin-sub-text">ESPAÃ‡O</span>
+                <span class="spin-sub-text">ESPAÇO</span>
               </div>
             </button>
 
@@ -251,15 +251,15 @@
       </div>
     </section>
 
-    <!-- Coluna Direita: HistÃ³rico de Rodadas Recentes & EstatÃ­sticas -->
+    <!-- Coluna Direita: Histórico de Rodadas Recentes & Estatísticas -->
     <aside id="tab-history" class="sidebar-panel sidebar-right tab-content-panel">
       <div class="panel-card history-panel-card">
         <div class="panel-header">
           <div class="panel-title">
-            <span class="panel-icon">ðŸ“œ</span>
-            <h3>Ãšltimas Rodadas</h3>
+            <span class="panel-icon">📜</span>
+            <h3>Últimas Rodadas</h3>
           </div>
-          <button id="btn-clear-history" class="btn-subtle" title="Limpar histÃ³rico recente">Limpar</button>
+          <button id="btn-clear-history" class="btn-subtle" title="Limpar histórico recente">Limpar</button>
         </div>
         
         <div id="history-list" class="history-list-box">
@@ -268,7 +268,7 @@
 
         <div class="panel-footer-info">
           <div class="quick-rule-tip">
-            <span>ðŸ’¡ Dica:</span> 3 sÃ­mbolos idÃªnticos pagam atÃ© 100x! 2 sÃ­mbolos jÃ¡ garantem retorno.
+            <span>💡 Dica:</span> 3 símbolos idênticos pagam até 100x! 2 símbolos já garantem retorno.
           </div>
         </div>
       </div>
@@ -279,7 +279,7 @@
   <!-- OVERLAY E MODAIS -->
   <div id="modal-overlay" class="modal-overlay">
 
-    <!-- Modal de AutenticaÃ§Ã£o (Login / Cadastro) -->
+    <!-- Modal de Autenticação (Login / Cadastro) -->
     <div id="auth-modal" class="modal-window auth-modal">
       <div class="modal-header-row">
         <h2 class="modal-title" id="auth-modal-title">ACESSO CYBER SLOTS</h2>
@@ -298,10 +298,10 @@
         <div class="g_id_signin" data-type="standard" data-theme="filled_black" data-size="large" data-text="continue_with" data-shape="pill"></div>
       </div>
 
-      <!-- FormulÃ¡rio de Login -->
+      <!-- Formulário de Login -->
       <form id="login-form" class="auth-form active">
         <div class="form-group">
-          <label for="login-username">Nome de UsuÃ¡rio:</label>
+          <label for="login-username">Nome de Usuário:</label>
           <input type="text" id="login-username" maxlength="16" placeholder="Seu apelido" autocomplete="username" required>
         </div>
         <div class="form-group">
@@ -311,38 +311,38 @@
         <button type="submit" id="btn-submit-login" class="btn-modal-primary">ENTRAR NO JOGO</button>
       </form>
 
-      <!-- FormulÃ¡rio de Cadastro -->
+      <!-- Formulário de Cadastro -->
       <form id="register-form" class="auth-form">
         <div class="welcome-gift-card">
-          <div class="gift-icon">ðŸŽ</div>
+          <div class="gift-icon">🎁</div>
           <div class="gift-info">
-            <span class="gift-label">SALDO INICIAL ÃšNICO:</span>
+            <span class="gift-label">SALDO INICIAL ÚNICO:</span>
             <strong class="gift-amount">+1.000 MOEDAS</strong>
           </div>
         </div>
         <div class="form-group">
-          <label for="register-username">Nome de UsuÃ¡rio (Ranking):</label>
+          <label for="register-username">Nome de Usuário (Ranking):</label>
           <input type="text" id="register-username" maxlength="16" placeholder="Ex: CyberMaster" autocomplete="username" required>
         </div>
         <div class="form-group">
-          <label for="register-password">Senha (mÃ­nimo 4 caracteres):</label>
+          <label for="register-password">Senha (mínimo 4 caracteres):</label>
           <input type="password" id="register-password" minlength="4" placeholder="Crie sua senha" autocomplete="new-password" required>
         </div>
         <div class="form-group">
           <label for="register-avatar">Escolha seu Avatar Neon:</label>
           <select id="register-avatar">
-            <option value="âš¡">âš¡ Raio Neon</option>
-            <option value="ðŸ¥·">ðŸ¥· Ninja Cyber</option>
-            <option value="ðŸ¤–">ðŸ¤– Androide</option>
-            <option value="ðŸ‘¾">ðŸ‘¾ Pixel Retro</option>
-            <option value="ðŸ”®">ðŸ”® Orbe MÃ¡gico</option>
-            <option value="ðŸ‘‘">ðŸ‘‘ Realeza</option>
-            <option value="ðŸŽ²">ðŸŽ² Dado da Sorte</option>
-            <option value="ðŸš€">ðŸš€ Foguete</option>
+            <option value="⚡">⚡ Raio Neon</option>
+            <option value="🥷">🥷 Ninja Cyber</option>
+            <option value="🤖">🤖 Androide</option>
+            <option value="👾">👾 Pixel Retro</option>
+            <option value="🔮">🔮 Orbe Mágico</option>
+            <option value="👑">👑 Realeza</option>
+            <option value="🎲">🎲 Dado da Sorte</option>
+            <option value="🚀">🚀 Foguete</option>
           </select>
         </div>
         <div class="modal-disclaimer-box">
-          <p>âš ï¸ <strong>Regra do Jogo:</strong> NÃ£o Ã© possÃ­vel recarregar moedas. Jogue com precisÃ£o para salvar seu recorde e liderar o Ranking Global!</p>
+          <p>⚠️ <strong>Regra do Jogo:</strong> Não é possível recarregar moedas. Jogue com precisão para salvar seu recorde e liderar o Ranking Global!</p>
         </div>
         <button type="submit" id="btn-submit-register" class="btn-modal-primary">CRIAR CONTA E JOGAR</button>
       </form>
@@ -350,25 +350,25 @@
 
     <!-- Modal de Boas-Vindas (Primeiro Acesso) -->
     <div id="welcome-modal" class="modal-window welcome-modal">
-      <div class="modal-decor-icon">ðŸŽ°</div>
+      <div class="modal-decor-icon">🎰</div>
       <h2 class="modal-title">BEM-VINDO AO CYBER SLOTS!</h2>
-      <p class="modal-lead">Sua experiÃªncia futurista de caÃ§a-nÃ­queis com ranking 100% real e moedas virtuais.</p>
+      <p class="modal-lead">Sua experiência futurista de caça-níqueis com ranking 100% real e moedas virtuais.</p>
       
       <div class="welcome-gift-card">
-        <div class="gift-icon">ðŸŽ</div>
+        <div class="gift-icon">🎁</div>
         <div class="gift-info">
-          <span class="gift-label">BÃ”NUS DE BOAS-VINDAS:</span>
+          <span class="gift-label">BÔNUS DE BOAS-VINDAS:</span>
           <strong class="gift-amount">+1.000 MOEDAS NO CADASTRO</strong>
         </div>
       </div>
 
       <div class="modal-disclaimer-box">
-        <p>âš ï¸ <strong>Aviso Importante:</strong> Para que seu saldo e score fiquem gravados permanentemente e vocÃª apareÃ§a no Ranking Real, conecte-se Ã  sua conta.</p>
+        <p>⚠️ <strong>Aviso Importante:</strong> Para que seu saldo e score fiquem gravados permanentemente e você apareça no Ranking Real, conecte-se à sua conta.</p>
       </div>
 
       <div class="welcome-buttons-row">
-        <button id="btn-welcome-register" class="btn-modal-primary">CRIAR CONTA GRÃTIS</button>
-        <button id="btn-welcome-login" class="btn-modal-secondary">JÃ POSSUO CONTA</button>
+        <button id="btn-welcome-register" class="btn-modal-primary">CRIAR CONTA GRÁTIS</button>
+        <button id="btn-welcome-login" class="btn-modal-secondary">JÁ POSSUO CONTA</button>
       </div>
     </div>
 
@@ -378,7 +378,7 @@
         <h2 class="modal-title">TABELA DE MULTIPLICADORES</h2>
         <button class="modal-close-btn" aria-label="Fechar">&times;</button>
       </div>
-      <p class="modal-sub">PremiaÃ§Ãµes baseadas na linha de pagamento central:</p>
+      <p class="modal-sub">Premiações baseadas na linha de pagamento central:</p>
       
       <div id="paytable-symbols-list" class="paytable-grid">
         <!-- Renderizado dinamicamente via js/app.js -->
@@ -387,9 +387,9 @@
       <div class="paytable-rules-summary">
         <h4>Regras do Jogo:</h4>
         <ul>
-          <li><strong>3 sÃ­mbolos iguais:</strong> multiplicador integral listado acima.</li>
-          <li><strong>2 sÃ­mbolos iguais:</strong> retorno parcial para manter sua adrenalina.</li>
-          <li><strong>ðŸ‘‘ Coroa Suprema:</strong> maior combinaÃ§Ã£o do jogo (100x aposta!).</li>
+          <li><strong>3 símbolos iguais:</strong> multiplicador integral listado acima.</li>
+          <li><strong>2 símbolos iguais:</strong> retorno parcial para manter sua adrenalina.</li>
+          <li><strong>👑 Coroa Suprema:</strong> maior combinação do jogo (100x aposta!).</li>
           <li>O jogo utiliza um algoritmo de RNG (Random Number Generator) nativo executado no navegador.</li>
         </ul>
       </div>
@@ -412,57 +412,57 @@
       <div class="form-group">
         <label for="profile-avatar-file">Foto de perfil:</label>
         <input type="file" id="profile-avatar-file" accept="image/jpeg,image/png,image/webp" aria-describedby="profile-avatar-help">
-        <small id="profile-avatar-help">JPG, PNG ou WebP, atÃ© 5 MB. Sem escolher um arquivo, sua foto atual serÃ¡ mantida.</small>
+        <small id="profile-avatar-help">JPG, PNG ou WebP, até 5 MB. Sem escolher um arquivo, sua foto atual será mantida.</small>
       </div>
 
       <button id="btn-save-profile" class="btn-modal-primary">SALVAR PERFIL</button>
     </div>
 
-    <!-- Modal Especial de JACKPOT / Super PrÃªmio -->
+    <!-- Modal Especial de JACKPOT / Super Prêmio -->
     <div id="jackpot-modal" class="modal-window jackpot-modal">
-      <div class="jackpot-crown-anim">ðŸ‘‘</div>
+      <div class="jackpot-crown-anim">👑</div>
       <h2 class="jackpot-title">JACKPOT SUPREMO!</h2>
-      <p id="jackpot-message" class="jackpot-sub">TRÃŠS COROAS NEON ALINHADAS!</p>
+      <p id="jackpot-message" class="jackpot-sub">TRÊS COROAS NEON ALINHADAS!</p>
       
       <div class="jackpot-amount-banner">
         <span id="jackpot-win-amount" class="jackpot-val">+100.000</span>
         <span class="jackpot-currency">MOEDAS VIRTUAIS</span>
       </div>
 
-      <button id="btn-claim-jackpot" class="btn-modal-primary jackpot-claim-btn">COLETAR PRÃŠMIO!</button>
+      <button id="btn-claim-jackpot" class="btn-modal-primary jackpot-claim-btn">COLETAR PRÊMIO!</button>
     </div>
 
-    <!-- Modal de ConfirmaÃ§Ã£o de Reset VoluntÃ¡rio -->
+    <!-- Modal de Confirmação de Reset Voluntário -->
     <div id="reset-confirm-modal" class="modal-window reset-confirm-modal">
       <div class="modal-header-row">
         <h2 class="modal-title">Resetar saldo?</h2>
         <button class="modal-close-btn" aria-label="Fechar">&times;</button>
       </div>
-      <p class="modal-lead">Seu saldo atual serÃ¡ substituÃ­do pelo saldo inicial de 1.000 moedas.</p>
+      <p class="modal-lead">Seu saldo atual será substituído pelo saldo inicial de 1.000 moedas.</p>
       <div class="confirm-modal-buttons">
         <button id="btn-cancel-reset" class="btn-modal-secondary">Cancelar</button>
         <button id="btn-confirm-reset" class="btn-modal-confirm-reset">Confirmar reset</button>
       </div>
     </div>
 
-    <!-- Modal de Fim de Jogo (Reset por PuniÃ§Ã£o quando saldo for 0) -->
+    <!-- Modal de Fim de Jogo (Reset por Punição quando saldo for 0) -->
     <div id="modal-game-over" class="modal-window game-over-modal">
-      <div class="game-over-icon">ðŸ’€</div>
+      <div class="game-over-icon">💀</div>
       <h2 class="modal-title game-over-title">Fim de Jogo!</h2>
-      <p class="modal-lead">VocÃª perdeu todas as suas moedas virtuais.</p>
-      <p class="modal-sub">Sua Ãºnica opÃ§Ã£o Ã© reiniciar o jogo. Como puniÃ§Ã£o, vocÃª retornarÃ¡ com <strong>500 moedas</strong>.</p>
+      <p class="modal-lead">Você perdeu todas as suas moedas virtuais.</p>
+      <p class="modal-sub">Sua única opção é reiniciar o jogo. Como punição, você retornará com <strong>500 moedas</strong>.</p>
       <button id="btn-reset-punishment" class="btn-reset-punishment">
-        <span class="reset-icon">ðŸ”„</span>
+        <span class="reset-icon">🔄</span>
         <span>Reiniciar (500 Moedas)</span>
       </button>
     </div>
 
   </div>
 
-  <!-- Toast de NotificaÃ§Ãµes RÃ¡pidas -->
+  <!-- Toast de Notificações Rápidas -->
   <div id="toast" class="toast-notification"></div>
 
-  <!-- Scripts Universais em Ordem de DependÃªncia e SeguranÃ§a -->
+  <!-- Scripts Universais em Ordem de Dependência e Segurança -->
   <script src="js/config.js"></script>
   <script src="js/security.js"></script>
   <script src="js/audio.js"></script>
@@ -473,3 +473,4 @@
   <script src="js/app.js"></script>
 </body>
 </html>
+
