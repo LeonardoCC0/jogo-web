@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>CYBER SLOTS • Painel Administrativo</title>
+  <meta name="description" content="Painel administrativo e central do fundador do Cyber Neon Slots.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body class="admin-body">
+
+  <!-- Tela de Acesso Negado (exibida caso usuário não seja admin/fundador) -->
+  <div id="access-denied-screen" class="access-denied-screen hidden">
+    <div class="access-denied-card">
+      <div class="denied-icon">🛑</div>
+      <h1 class="denied-title">ACESSO RESTRITO // 403</h1>
+      <p class="denied-msg">Esta área é exclusiva para administradores autorizados e para a conta fundadora do Cyber Neon Slots.</p>
+      <div class="denied-reason">Todas as requisições administrativas são autenticadas e validadas diretamente no servidor.</div>
+      <div class="denied-actions">
+        <a href="/" class="btn-admin-action btn-primary-neon">← Retornar ao Jogo</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Painel Administrativo Principal -->
+  <div id="admin-app" class="admin-wrapper hidden">
+    
+    <!-- Topbar Administrativa -->
+    <header class="admin-header">
+      <div class="header-left">
+        <div class="admin-logo">
+          <span class="logo-emoji">⚡</span>
+          <div class="logo-text">
+            <span class="logo-title" id="admin-header-title">CYBER SLOTS // ADMIN</span>
+            <span class="logo-subtitle" id="admin-header-subtitle">PAINEL DE CONTROLE</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <div id="admin-badge-role" class="badge-role badge-role-admin">
+          <span id="admin-badge-icon">⚙</span>
+          <span id="admin-badge-text">ADMINISTRADOR</span>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <div class="current-admin-info">
+          <span class="admin-avatar" id="current-admin-avatar">👤</span>
+          <div class="admin-meta">
+            <span class="admin-name" id="current-admin-name">Carregando...</span>
+            <span class="admin-email" id="current-admin-email">...</span>
+          </div>
+        </div>
+        <a href="/" class="btn-top-nav" title="Voltar ao Jogo">
+          <span>🎮</span>
+          <span class="nav-label">Jogo</span>
+        </a>
+        <button id="btn-admin-logout" class="btn-top-nav btn-logout-nav" title="Encerrar Sessão">
+          <span>🚪</span>
+          <span class="nav-label">Sair</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Barra de Navegação por Abas -->
+    <nav class="admin-tabs-nav">
+      <button class="tab-btn active" data-tab="tab-dashboard">
+        <span class="tab-icon">📊</span>
+        <span>Dashboard</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-players">
+        <span class="tab-icon">👥</span>
+        <span>Jogadores</span>
+      </button>
+      <button class="tab-btn tab-founder-only hidden" id="tab-btn-admins" data-tab="tab-admins">
+        <span class="tab-icon">⚡</span>
+        <span>Administradores</span>
+        <span class="tag-founder-only">FUNDADOR</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-logs">
+        <span class="tab-icon">📜</span>
+        <span>Auditoria</span>
+      </button>
+    </nav>
+
+    <!-- Conteúdo Principal -->
+    <main class="admin-main">
+
+      <!-- ================= ABA 1: DASHBOARD ================= -->
+      <section id="tab-dashboard" class="tab-content active">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Visão Geral do Sistema</h2>
+            <p class="section-desc">Métricas operacionais e integridade do Cyber Neon Slots em tempo real.</p>
+          </div>
+          <button id="btn-refresh-stats" class="btn-icon-refresh" title="Atualizar Métricas">
+            <span>🔄</span> Atualizar
+          </button>
+        </div>
+
+        <!-- Cards de Estatísticas -->
+        <div class="stats-grid">
+          <div class="stat-card cyan">
+            <div class="stat-top">
+              <span class="stat-label">Total de Jogadores</span>
+              <span class="stat-icon">👥</span>
+            </div>
+            <div class="stat-value" id="stat-total-users">--</div>
+            <div class="stat-footer">Contas cadastradas no banco</div>
+          </div>
+
+          <div class="stat-card gold">
+            <div class="stat-top">
+              <span class="stat-label">Saldo em Circulação</span>
+              <span class="stat-icon">🪙</span>
+            </div>
+            <div class="stat-value" id="stat-total-balance">--</div>
+            <div class="stat-footer">Moedas virtuais ativas</div>
+          </div>
+
+          <div class="stat-card purple">
+            <div class="stat-top">
+              <span class="stat-label">Total de Giros</span>
+              <span class="stat-icon">🎰</span>
+            </div>
+            <div class="stat-value" id="stat-total-spins">--</div>
+            <div class="stat-footer">Partidas autoritativas computadas</div>
+          </div>
+
+          <div class="stat-card red">
+            <div class="stat-top">
+              <span class="stat-label">Usuários Banidos</span>
+              <span class="stat-icon">🚫</span>
+            </div>
+            <div class="stat-value" id="stat-total-banned">--</div>
+            <div class="stat-footer">Acessos revogados</div>
+          </div>
+
+          <div class="stat-card green">
+            <div class="stat-top">
+              <span class="stat-label">Administradores</span>
+              <span class="stat-icon">🛡</span>
+            </div>
+            <div class="stat-value" id="stat-total-admins">--</div>
+            <div class="stat-footer">Membros com privilégios</div>
+          </div>
+
+          <div class="stat-card blue">
+            <div class="stat-top">
+              <span class="stat-label">Armazenamento</span>
+              <span class="stat-icon">💾</span>
+            </div>
+            <div class="stat-value mode-badge" id="stat-storage-mode">Local JSON</div>
+            <div class="stat-footer">Persistência segura em servidor</div>
+          </div>
+        </div>
+
+        <!-- Banner de Segurança e Fundador -->
+        <div class="security-banner">
+          <div class="security-banner-icon">👑</div>
+          <div class="security-banner-info">
+            <h3>Conta Fundadora Imutável</h3>
+            <p>A conta <code>47131@raphaeldisanto.com.br</code> possui permissão máxima do sistema (Founder). É protegida por regras rígidas de backend contra banimento, exclusão ou rebaixamento.</p>
+          </div>
+          <div class="security-badge-shield">
+            <span>🛡</span> Backend Authoritative
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= ABA 2: JOGADORES ================= -->
+      <section id="tab-players" class="tab-content">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Gerenciamento de Jogadores</h2>
+            <p class="section-desc">Consulte jogadores, ajuste saldos com auditoria e administre restrições de acesso.</p>
+          </div>
+          <div class="section-actions">
+            <button id="btn-refresh-players" class="btn-icon-refresh" title="Atualizar Lista">
+              <span>🔄</span> Atualizar
+            </button>
+          </div>
+        </div>
+
+        <!-- Barra de Busca e Filtros -->
+        <div class="filter-bar">
+          <div class="search-input-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="filter-player-search" placeholder="Buscar por username, nome ou email..." autocomplete="off">
+          </div>
+
+          <div class="select-filter-wrap">
+            <label for="filter-player-role">Função:</label>
+            <select id="filter-player-role">
+              <option value="all">Todas as Funções</option>
+              <option value="user">Usuários Comuns</option>
+              <option value="admin">Administradores</option>
+              <option value="founder">Fundador</option>
+              <option value="banned">Banidos</option>
+            </select>
+          </div>
+
+          <div class="select-filter-wrap">
+            <label for="filter-player-sort">Ordenar por:</label>
+            <select id="filter-player-sort">
+              <option value="balance_desc">Maior Saldo</option>
+              <option value="balance_asc">Menor Saldo</option>
+              <option value="date_desc">Mais Recentes</option>
+              <option value="name_asc">Nome (A-Z)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Tabela de Jogadores -->
+        <div class="table-container">
+          <table class="cyber-table" id="table-players">
+            <thead>
+              <tr>
+                <th>Jogador</th>
+                <th>Email</th>
+                <th>Saldo</th>
+                <th>Maior Vitória</th>
+                <th>Função</th>
+                <th>Status</th>
+                <th>Cadastro</th>
+                <th class="th-actions">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="players-table-body">
+              <tr>
+                <td colspan="8" class="td-loading">Carregando dados dos jogadores...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ================= ABA 3: ADMINISTRADORES (FUNDADOR) ================= -->
+      <section id="tab-admins" class="tab-content">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Controle de Administradores</h2>
+            <p class="section-desc">Exclusivo do Fundador: promova usuários de confiança ou revogue acessos administrativos.</p>
+          </div>
+          <button id="btn-open-promote-modal" class="btn-admin-action btn-gold">
+            <span>⚡</span> Promover Novo Administrador
+          </button>
+        </div>
+
+        <div class="founder-notice-card">
+          <div class="notice-icon">🔒</div>
+          <div class="notice-text">
+            <strong>Proteção de Hierarquia do Sistema</strong>
+            <p>Apenas a conta de Fundador (<code>47131@raphaeldisanto.com.br</code>) tem permissão de promover ou despromover administradores. Administradores comuns não podem gerenciar outros administradores.</p>
+          </div>
+        </div>
+
+        <!-- Lista de Administradores Atuais -->
+        <div class="table-container">
+          <table class="cyber-table" id="table-admins">
+            <thead>
+              <tr>
+                <th>Administrador</th>
+                <th>Email</th>
+                <th>Função</th>
+                <th>Saldo</th>
+                <th>Data de Entrada</th>
+                <th class="th-actions">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="admins-table-body">
+              <tr>
+                <td colspan="6" class="td-loading">Carregando administradores...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ================= ABA 4: AUDITORIA / LOGS ================= -->
+      <section id="tab-logs" class="tab-content">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Logs de Auditoria Administrativa</h2>
+            <p class="section-desc">Histórico completo e imutável de todas as intervenções executadas no sistema.</p>
+          </div>
+          <button id="btn-more-logs" class="btn-row-action hidden" type="button">Carregar mais logs</button>
+          <button id="btn-refresh-logs" class="btn-icon-refresh" title="Atualizar Histórico">
+            <span>🔄</span> Atualizar
+          </button>
+        </div>
+
+        <div class="filter-bar">
+          <div class="search-input-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="filter-log-search" placeholder="Filtrar logs por motivo, usuário ou admin..." autocomplete="off">
+          </div>
+          <div class="select-filter-wrap">
+            <label for="filter-log-action">Tipo de Ação:</label>
+            <select id="filter-log-action">
+              <option value="all">Todas as Ações</option>
+              <option value="balance_change">Alteração de Saldo</option>
+              <option value="ban">Banimento</option>
+              <option value="unban">Desbanimento</option>
+              <option value="delete_user">Remoção de Conta</option>
+              <option value="admin_promote">Promoção de Admin</option>
+              <option value="admin_demote">Rebaixamento de Admin</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="cyber-table" id="table-logs">
+            <thead>
+              <tr>
+                <th>Data / Hora</th>
+                <th>Ação</th>
+                <th>Administrador</th>
+                <th>Jogador Alvo</th>
+                <th>Detalhes</th>
+                <th>Justificativa / Motivo</th>
+                <th>IP</th>
+              </tr>
+            </thead>
+            <tbody id="logs-table-body">
+              <tr>
+                <td colspan="7" class="td-loading">Carregando logs de auditoria...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ================= MODAIS ADMINISTRATIVOS ================= -->
+
+  <!-- Modal 1: Alterar Saldo -->
+  <div id="modal-change-balance" class="admin-modal-overlay hidden">
+    <div class="admin-modal-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-badge-icon">🪙</span>
+          <h3 class="modal-title">Alterar Saldo do Jogador</h3>
+        </div>
+        <button class="modal-close-x" data-close="modal-change-balance">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="target-user-summary">
+          <span class="user-avatar-tag" id="bal-modal-avatar">👤</span>
+          <div>
+            <div class="target-name" id="bal-modal-name">Nome do Jogador</div>
+            <div class="target-sub" id="bal-modal-sub">@username • email</div>
+          </div>
+        </div>
+
+        <div class="current-bal-banner">
+          <span>Saldo Atual:</span>
+          <strong id="bal-modal-current">0</strong>
+          <span>moedas</span>
+        </div>
+
+        <div class="form-group">
+          <label>Tipo de Operação:</label>
+          <div class="radio-op-group">
+            <label class="radio-op">
+              <input type="radio" name="bal-op-type" value="add" checked>
+              <span>➕ Adicionar Saldo</span>
+            </label>
+            <label class="radio-op">
+              <input type="radio" name="bal-op-type" value="set">
+              <span>🎯 Definir Saldo Exato</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="bal-input-amount" id="bal-label-amount">Valor a Adicionar:</label>
+          <input type="number" id="bal-input-amount" min="1" max="100000000" placeholder="Ex: 5000" value="1000">
+          <div class="amount-quick-chips">
+            <button type="button" class="quick-chip" data-val="500">+500</button>
+            <button type="button" class="quick-chip" data-val="1000">+1.000</button>
+            <button type="button" class="quick-chip" data-val="5000">+5.000</button>
+            <button type="button" class="quick-chip" data-val="10000">+10.000</button>
+            <button type="button" class="quick-chip" data-val="50000">+50.000</button>
+          </div>
+        </div>
+
+        <div class="preview-box">
+          <div class="preview-line">
+            <span>Novo Saldo Previsto:</span>
+            <strong id="bal-preview-new">0 moedas</strong>
+          </div>
+          <div class="preview-diff" id="bal-preview-diff">+0 moedas</div>
+        </div>
+
+        <div class="form-group">
+          <label for="bal-input-reason">Motivo Obrigatório (Auditoria):</label>
+          <input type="text" id="bal-input-reason" placeholder="Ex: Bonificação de evento, correção de saldo..." maxlength="200" required>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-admin-cancel" data-close="modal-change-balance">Cancelar</button>
+        <button type="button" id="btn-confirm-balance" class="btn-admin-action btn-cyan">Confirmar Alteração</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Banir Jogador -->
+  <div id="modal-ban-user" class="admin-modal-overlay hidden">
+    <div class="admin-modal-card card-danger">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-badge-icon">🚫</span>
+          <h3 class="modal-title">Banir Jogador</h3>
+        </div>
+        <button class="modal-close-x" data-close="modal-ban-user">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="modal-warning-text">
+          Você está prestes a banir o jogador <strong id="ban-modal-username">@jogador</strong>.
+        </p>
+        <div class="warning-callout">
+          ⚠️ <strong>Efeito Imediato:</strong> Todas as sessões ativas deste jogador serão encerradas no servidor e ele não poderá mais fazer login nem realizar giros.
+        </div>
+
+        <div class="form-group">
+          <label for="ban-input-reason">Motivo do Banimento (Obrigatório):</label>
+          <textarea id="ban-input-reason" rows="3" placeholder="Ex: Suspeita de script automatizado, comportamento abusivo..." required></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-admin-cancel" data-close="modal-ban-user">Cancelar</button>
+        <button type="button" id="btn-confirm-ban" class="btn-admin-action btn-danger">Confirmar Banimento</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 3: Desbanir Jogador -->
+  <div id="modal-unban-user" class="admin-modal-overlay hidden">
+    <div class="admin-modal-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-badge-icon">✅</span>
+          <h3 class="modal-title">Desbanir Jogador</h3>
+        </div>
+        <button class="modal-close-x" data-close="modal-unban-user">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <p>
+          Restaurar o acesso do jogador <strong id="unban-modal-username">@jogador</strong>?
+        </p>
+        <div class="form-group">
+          <label for="unban-input-reason">Motivo do Desbanimento (Obrigatório):</label>
+          <input type="text" id="unban-input-reason" placeholder="Ex: Recurso aprovado, suspensão encerrada..." required>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-admin-cancel" data-close="modal-unban-user">Cancelar</button>
+        <button type="button" id="btn-confirm-unban" class="btn-admin-action btn-green">Confirmar Desbanimento</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 4: Remover Conta Permanentemente -->
+  <div id="modal-delete-user" class="admin-modal-overlay hidden">
+    <div class="admin-modal-card card-critical">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-badge-icon">🗑</span>
+          <h3 class="modal-title">Excluir Conta Permanentemente</h3>
+        </div>
+        <button class="modal-close-x" data-close="modal-delete-user">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="critical-warning">
+          <strong>AÇÃO IRREVERSÍVEL:</strong> A conta do jogador <strong id="del-modal-target-user">@jogador</strong> e todo o seu saldo e histórico serão apagados permanentemente.
+        </p>
+
+        <div class="form-group">
+          <label for="del-input-confirm">Digite o username exato <code id="del-modal-confirm-target">jogador</code> para confirmar:</label>
+          <input type="text" id="del-input-confirm" placeholder="Digite o username aqui..." autocomplete="off">
+        </div>
+
+        <div class="form-group">
+          <label for="del-input-reason">Motivo da Exclusão (Obrigatório):</label>
+          <input type="text" id="del-input-reason" placeholder="Ex: Solicitação do usuário, limpeza..." required>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-admin-cancel" data-close="modal-delete-user">Cancelar</button>
+        <button type="button" id="btn-confirm-delete" class="btn-admin-action btn-danger" disabled>Excluir Conta</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 5: Promover a Administrador (Exclusivo Fundador) -->
+  <div id="modal-promote-admin" class="admin-modal-overlay hidden">
+    <div class="admin-modal-card card-gold">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-badge-icon">⚡</span>
+          <h3 class="modal-title">Promover a Administrador</h3>
+        </div>
+        <button class="modal-close-x" data-close="modal-promote-admin">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="promote-select-user">Selecione o Jogador:</label>
+          <select id="promote-select-user">
+            <option value="">Carregando usuários elegíveis...</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="promote-input-reason">Motivo da Concessão de Privilégios (Obrigatório):</label>
+          <input type="text" id="promote-input-reason" placeholder="Ex: Novo membro da equipe de moderação..." required>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-admin-cancel" data-close="modal-promote-admin">Cancelar</button>
+        <button type="button" id="btn-confirm-promote" class="btn-admin-action btn-gold">Promover Administrador</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 6: Rebaixar Administrador (Exclusivo Fundador) -->
+  <div id="modal-demote-admin" class="admin-modal-overlay hidden">
+    <div class="admin-modal-card card-danger">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-badge-icon">⬇</span>
+          <h3 class="modal-title">Rebaixar Administrador</h3>
+        </div>
+        <button class="modal-close-x" data-close="modal-demote-admin">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <p>
+          Tem certeza de que deseja remover os privilégios administrativos de <strong id="demote-modal-target">@admin</strong>? Ele retornará ao status de usuário comum.
+        </p>
+
+        <div class="form-group">
+          <label for="demote-input-reason">Motivo do Rebaixamento (Obrigatório):</label>
+          <input type="text" id="demote-input-reason" placeholder="Ex: Fim do período de moderação..." required>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-admin-cancel" data-close="modal-demote-admin">Cancelar</button>
+        <button type="button" id="btn-confirm-demote" class="btn-admin-action btn-danger">Confirmar Rebaixamento</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notificações Toast -->
+  <div id="admin-toast" class="admin-toast hidden"></div>
+
+  <!-- Scripts -->
+  <script src="js/storage.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>

@@ -1,155 +1,135 @@
+/**
+ * CYBER NEON SLOTS - Camada de Persistência Híbrida
+ * Suporta:
+ * 1. Arquivo local db.json (para desenvolvimento e execução local via Node.js)
+ * 2. Vercel KV / Upstash Redis via REST API (para deploy 100% gratuito e persistente na Vercel)
+ * 3. Fallback em memória
+ */
+
 const fs = require('fs');
 const path = require('path');
-const { AsyncLocalStorage } = require('async_hooks');
 
-const scope = new AsyncLocalStorage();
+const DB_FILE = path.join(__dirname, 'data', 'db.json');
 
-const DB_FILE =
-    process.env.NODE_ENV === 'test' && process.env.TEST_DB_FILE
-        ? process.env.TEST_DB_FILE
-        : path.join(__dirname, 'data', 'db.json');
+// Configurações para Vercel KV / Upstash Redis REST
+const KV_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+const KV_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+const KV_KEY = 'cyber_slots_db_v1';
 
-let queue = Promise.resolve();
+let inMemoryDb = null;
 
-function initial() {
-    return {
-        users: {},
-        sessions: {},
-        history: [],
-        admin_logs: [],
-        total_spins: 0
-    };
+// Estrutura inicial limpa (sem bots)
+function getInitialData() {
+  return {
+    users: {},       // key: lowercase username -> { id, username, displayName, email, role, isBanned, passwordHash, salt, avatar, balance, highestWin, score, createdAt, updatedAt }
+    sessions: {},    // key: token -> { userId, username, createdAt }
+    history: [],
+    admin_logs: [],  // registros de auditoria administrativa
+    total_spins: 0
+  };
 }
 
-function parse(raw) {
-    let data = raw ? JSON.parse(raw) : initial();
-
-    if (typeof data === 'string') {
-        data = JSON.parse(data);
+// Carrega dados locais do db.json
+function loadLocalDb() {
+  try {
+    if (fs.existsSync(DB_FILE)) {
+      const raw = fs.readFileSync(DB_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (!parsed.users) parsed.users = {};
+      if (!parsed.sessions) parsed.sessions = {};
+      if (!parsed.admin_logs) parsed.admin_logs = [];
+      if (typeof parsed.total_spins !== 'number') parsed.total_spins = 0;
+      return parsed;
     }
-
-    return Object.assign(initial(), data);
+  } catch (e) {
+    console.warn('Aviso: Não foi possível ler db.json local:', e.message);
+  }
+  const initial = getInitialData();
+  saveLocalDb(initial);
+  return initial;
 }
 
-function ensureDirectory() {
-    fs.mkdirSync(path.dirname(DB_FILE), {
-        recursive: true
+// Salva dados locais no db.json
+function saveLocalDb(data) {
+  try {
+    const dir = path.dirname(DB_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch (e) {
+    console.warn('Aviso: Não foi possível gravar db.json local:', e.message);
+  }
+}
+
+// Operações assíncronas no Vercel KV
+async function loadFromKv() {
+  if (!KV_URL || !KV_TOKEN) return null;
+  try {
+    const res = await fetch(`${KV_URL}/get/${KV_KEY}`, {
+      headers: {
+        Authorization: `Bearer ${KV_TOKEN}`
+      }
     });
-}
-
-function readDatabase() {
-    ensureDirectory();
-
-    if (!fs.existsSync(DB_FILE)) {
-        const data = initial();
-
-        fs.writeFileSync(
-            DB_FILE,
-            JSON.stringify(data, null, 2),
-            {
-                encoding: 'utf8',
-                mode: 0o600
-            }
-        );
-
-        return data;
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.result) {
+        return typeof data.result === 'string' ? JSON.parse(data.result) : data.result;
+      }
     }
-
-    return parse(fs.readFileSync(DB_FILE, 'utf8'));
+  } catch (e) {
+    console.error('Erro ao conectar ao Vercel KV:', e.message);
+  }
+  return null;
 }
 
-function writeDatabase(data) {
-    ensureDirectory();
-
-    const tempFile = `${DB_FILE}.tmp`;
-
-    fs.writeFileSync(
-        tempFile,
-        JSON.stringify(data, null, 2),
-        {
-            encoding: 'utf8',
-            mode: 0o600
-        }
-    );
-
-    fs.renameSync(tempFile, DB_FILE);
+async function saveToKv(data) {
+  if (!KV_URL || !KV_TOKEN) return false;
+  try {
+    const res = await fetch(`${KV_URL}/set/${KV_KEY}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${KV_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(JSON.stringify(data))
+    });
+    return res.ok;
+  } catch (e) {
+    console.error('Erro ao salvar no Vercel KV:', e.message);
+    return false;
+  }
 }
 
 const Database = {
-
-    // Mantido porque o apiHandler utiliza essa função.
-    // O projeto agora NÃO utiliza Redis/KV.
-    isCloudMode() {
-        return false;
-    },
-
-    async get() {
-        const transaction = scope.getStore();
-
-        if (transaction) {
-            return transaction.data;
-        }
-
-        return readDatabase();
-    },
-
-    async save(data) {
-        const transaction = scope.getStore();
-
-        // Se estiver dentro de uma transaction,
-        // apenas marca os dados para serem gravados no final.
-        if (transaction) {
-            transaction.data = data;
-            transaction.dirty = true;
-            return true;
-        }
-
-        // Compatibilidade com as rotas antigas do apiHandler
-        // que fazem Database.get() + Database.save().
-        const pending = queue.then(
-            async () => {
-                writeDatabase(data);
-                return true;
-            },
-            async () => {
-                writeDatabase(data);
-                return true;
-            }
-        );
-
-        queue = pending.catch(() => {});
-
-        return pending;
-    },
-
-    async transaction(work) {
-        const run = async () => {
-            const transaction = {
-                data: readDatabase(),
-                dirty: false
-            };
-
-            const result = await scope.run(
-                transaction,
-                work
-            );
-
-            if (transaction.dirty) {
-                writeDatabase(transaction.data);
-            }
-
-            return result;
-        };
-
-        const pending = queue.then(
-            run,
-            run
-        );
-
-        queue = pending.catch(() => {});
-
-        return pending;
+  async get() {
+    if (KV_URL && KV_TOKEN) {
+      if (!inMemoryDb) {
+        const remote = await loadFromKv();
+        inMemoryDb = remote || getInitialData();
+      }
+      return inMemoryDb;
     }
+
+    if (!inMemoryDb) {
+      inMemoryDb = loadLocalDb();
+    }
+    return inMemoryDb;
+  },
+
+  async save(data) {
+    inMemoryDb = data;
+    if (KV_URL && KV_TOKEN) {
+      await saveToKv(data);
+    } else {
+      saveLocalDb(data);
+    }
+    return true;
+  },
+
+  isCloudMode() {
+    return !!(KV_URL && KV_TOKEN);
+  }
 };
 
 module.exports = Database;
