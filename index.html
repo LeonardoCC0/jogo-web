@@ -26,7 +26,7 @@
       <div class="logo-wrapper">
         <span class="logo-icon">🎰</span>
         <div class="logo-text-group">
-          <h1 class="game-logo">COSTA<span>SLOTS</span></h1>
+          <h1 class="game-logo">CYBER<span>SLOTS</span></h1>
           <span class="logo-sub">NEON ARCADE • 100% VIRTUAL</span>
         </div>
       </div>
@@ -80,7 +80,7 @@
       </button>
 
       <!-- Card do Perfil do Jogador (quando logado) -->
-      <div id="player-profile" class="player-profile-chip hidden" title="Jogador conectado">
+      <div id="player-profile" class="player-profile-chip hidden" role="button" tabindex="0" title="Editar seu nome no ranking" aria-label="Editar perfil">
         <div id="player-avatar-icon" class="profile-avatar">⚡</div>
         <div class="profile-meta">
           <span id="player-name-text" class="profile-name">CyberPlayer</span>
@@ -291,18 +291,12 @@
         <button id="tab-register-btn" class="auth-tab" data-auth-tab="register">Criar Conta</button>
       </div>
 
-      <!-- Login Imediato com Google na Tela de Login / Cadastro -->
-      <div class="modal-google-auth-box">
-        <div id="google-login-modal-wrap" class="google-btn-modal-wrap">
-          <div class="g_id_signin" data-type="standard" data-shape="pill" data-theme="filled_black" data-text="continue_with" data-size="large" data-logo_alignment="left" data-width="280"></div>
-        </div>
-        <div class="modal-auth-divider">
-          <span>OU CONTINUE COM APELIDO</span>
-        </div>
-      </div>
-
       <div id="auth-error-box" class="auth-alert-box error hidden"></div>
       <div id="auth-success-box" class="auth-alert-box success hidden"></div>
+      <div class="auth-google-option">
+        <p>Entre ou crie sua conta com o Google</p>
+        <div class="g_id_signin" data-type="standard" data-theme="filled_black" data-size="large" data-text="continue_with" data-shape="pill"></div>
+      </div>
 
       <!-- Formulário de Login -->
       <form id="login-form" class="auth-form active">
@@ -372,16 +366,6 @@
         <p>⚠️ <strong>Aviso Importante:</strong> Para que seu saldo e score fiquem gravados permanentemente e você apareça no Ranking Real, conecte-se à sua conta.</p>
       </div>
 
-      <!-- Botão Google no Modal de Boas-Vindas -->
-      <div class="welcome-google-wrap">
-        <div id="google-login-welcome-wrap" class="google-btn-modal-wrap">
-          <div class="g_id_signin" data-type="standard" data-shape="pill" data-theme="filled_black" data-text="continue_with" data-size="large" data-logo_alignment="left" data-width="280"></div>
-        </div>
-        <div class="modal-auth-divider">
-          <span>OU ESCOLHA UMA OPÇÃO</span>
-        </div>
-      </div>
-
       <div class="welcome-buttons-row">
         <button id="btn-welcome-register" class="btn-modal-primary">CRIAR CONTA GRÁTIS</button>
         <button id="btn-welcome-login" class="btn-modal-secondary">JÁ POSSUO CONTA</button>
@@ -422,7 +406,7 @@
 
       <div class="form-group">
         <label for="profile-player-name">Seu Apelido:</label>
-        <input type="text" id="profile-player-name" maxlength="14" placeholder="Apelido">
+        <input type="text" id="profile-player-name" minlength="3" maxlength="24" placeholder="Seu nome no ranking">
       </div>
 
       <div class="form-group">

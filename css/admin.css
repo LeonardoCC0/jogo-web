@@ -1410,3 +1410,6 @@
     align-items: flex-end;
   }
 }
+.player-details-dialog { background: #101326; color: #e6edff; border: 1px solid #00f0ff; border-radius: 16px; padding: 28px; max-width: min(90vw, 620px); }
+.player-details-dialog::backdrop { background: #000b; }
+.player-details-dialog pre { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; font-family: inherit; }

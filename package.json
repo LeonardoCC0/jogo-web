@@ -1,11 +1,12 @@
 {
   "name": "cyber-neon-slots",
   "version": "2.0.0",
-  "description": "Jogo web moderno de caça-níqueis virtual de tela única com login, score persistente e ranking real - Supabase PostgreSQL",
+  "description": "Jogo web moderno de caça-níqueis virtual de tela única com login, score persistente e ranking real",
   "main": "index.html",
   "scripts": {
+    "build": "node server/build.js",
     "start": "node server/server.js",
-    "test": "node server/test_api.js"
+    "test": "node server/test_api.js && node server/test_db.js"
   },
   "keywords": [
     "slot-machine",

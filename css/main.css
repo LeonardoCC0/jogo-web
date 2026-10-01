@@ -425,12 +425,12 @@ body {
    CONTAINER DO JOGO (3 COLUNAS)
 ------------------------------------------------------------- */
 .game-container {
-  max-width: 1580px;
+  max-width: 1480px;
   width: 100%;
   margin: 0 auto;
   padding: 24px;
   display: grid;
-  grid-template-columns: 400px 1fr 320px;
+  grid-template-columns: 310px 1fr 310px;
   gap: 24px;
   align-items: start;
   flex: 1;
@@ -447,11 +447,8 @@ body {
   display: flex;
   flex-direction: column;
   height: calc(100vh - 120px);
-  min-height: 600px;
   position: sticky;
   top: 96px;
-  min-width: 0;
-  width: 100%;
 }
 
 .panel-card {
@@ -470,17 +467,9 @@ body {
 /* -------------------------------------------------------------
    RESPONSIVIDADE DO LAYOUT
 ------------------------------------------------------------- */
-@media (max-width: 1380px) {
-  .game-container {
-    grid-template-columns: 360px 1fr 300px;
-    gap: 20px;
-    padding: 20px;
-  }
-}
-
 @media (max-width: 1200px) {
   .game-container {
-    grid-template-columns: 330px 1fr 280px;
+    grid-template-columns: 280px 1fr 280px;
     gap: 16px;
     padding: 16px;
   }
@@ -489,7 +478,7 @@ body {
 @media (max-width: 992px) {
   .game-container {
     grid-template-columns: 1fr;
-    max-width: 680px;
+    max-width: 640px;
     padding: 16px;
   }
 

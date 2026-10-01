@@ -7,14 +7,14 @@ const { handleApiRequest } = require('../server/apiHandler');
 
 module.exports = async (req, res) => {
   const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-  const pathname = parsedUrl.pathname;
+  const pathname = ['/admin', '/admin/', '/admin.html'].includes(parsedUrl.pathname) ? '/api/admin/page' : parsedUrl.pathname;
 
   let body = req.body;
   if (typeof body === 'string') {
     try {
       body = JSON.parse(body);
     } catch (e) {
-      body = {};
+      return res.status(400).json({ error: 'JSON inválido.' });
     }
   } else if (!body) {
     body = {};

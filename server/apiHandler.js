@@ -22,21 +22,6 @@ const SYMBOLS = [
 ];
 
 async function verifyGoogleIdToken(token) {
-  // Suporte a mock controlado apenas em ambiente de teste automatizado
-  if (process.env.NODE_ENV === 'test' && token && token.startsWith('mock_google_token_')) {
-    const sub = token.replace('mock_google_token_', '');
-    return {
-      sub,
-      email: `user_${sub}@gmail.com`,
-      name: `Google User ${sub}`,
-      picture: '⚡',
-      email_verified: true,
-      iss: 'https://accounts.google.com',
-      aud: GOOGLE_CLIENT_ID,
-      exp: Math.floor(Date.now() / 1000) + 3600
-    };
-  }
-
   const ticket = await googleClient.verifyIdToken({
     idToken: token,
     audience: GOOGLE_CLIENT_ID
@@ -152,39 +137,35 @@ function extractToken(req, payload) {
   if (payload && payload.token) {
     return String(payload.token).trim();
   }
-  return null;
+  const cookie = (req.headers?.cookie || '').split(';').map(v => v.trim()).find(v => v.startsWith('cns_session='));
+  return cookie ? cookie.slice(12) : null;
 }
 
 const FOUNDER_EMAIL = '47131@raphaeldisanto.com.br';
+const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
+const { AsyncLocalStorage } = require('async_hooks');
+const founderContext = new AsyncLocalStorage();
 
 function isFounderUser(user) {
-  if (!user) return false;
-  if (user.role === 'founder') return true;
-  if (user.email && user.email.toLowerCase() === FOUNDER_EMAIL) return true;
-  if (user.username && user.username.toLowerCase() === FOUNDER_EMAIL) return true;
-  return false;
+  return !!user && user.id === founderContext.getStore()?.founderId;
 }
 
 function ensureFounderRole(user) {
   if (user && isFounderUser(user)) {
     user.role = 'founder';
     user.isBanned = false;
-  }
+  } else if (user?.role === 'founder') user.role = 'user';
 }
 
-async function getAuthenticatedUser(req, payload, db) {
+function getAuthenticatedUser(req, payload, db) {
   const token = extractToken(req, payload);
-  if (!token) return null;
-
-  const session = await Database.getSession(token);
-  if (!session) return null;
-
+  if (!token || !db.sessions || !db.sessions[token]) return null;
+  const session = db.sessions[token];
   const user = db.users && db.users[session.username];
-  if (!user) {
-    await Database.deleteSession(token);
+  if (!user || session.userId !== user.id || !Number.isFinite(session.createdAt) || session.createdAt + SESSION_TTL <= Date.now()) {
+    delete db.sessions[token];
     return null;
   }
-
   ensureFounderRole(user);
   return { user, token };
 }
@@ -204,89 +185,37 @@ function sanitizeUser(user) {
     isBanned: !!user.isBanned,
     banReason: user.banReason || '',
     bannedAt: user.bannedAt || null,
+    needsProfile: !!user.needsProfile,
     createdAt: user.createdAt
   };
 }
 
-async function handleApiRequest(req, res, pathname, method, payload = {}) {
+function sessionCookie(req, token) {
+  const secure = process.env.VERCEL || req.socket?.encrypted || process.env.COOKIE_SECURE === 'true';
+  return `cns_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${token ? SESSION_TTL / 1000 : 0}${secure ? '; Secure' : ''}`;
+}
 
-  // Proxy seguro para fotos de perfil do Google
-  if (pathname === '/api/avatar' && method === 'GET') {
-    try {
-      const requestUrl = new URL(
-        req.url,
-        `http://${req.headers.host || 'localhost'}`
-      );
+function requireAuth(req, payload, db) {
+  const auth = getAuthenticatedUser(req, payload, db);
+  if (!auth) return { status: 401, error: 'Sessão inválida ou expirada.' };
+  if (auth.user.isBanned || auth.user.role === 'banned') return { status: 403, error: `Conta banida. Motivo: ${auth.user.banReason || 'Violação das regras.'}` };
+  return auth;
+}
 
-      const avatarUrl = requestUrl.searchParams.get('url');
+function requireAdmin(req, payload, db) {
+  const auth = requireAuth(req, payload, db);
+  if (auth.error) return auth;
+  if (!['admin', 'founder'].includes(auth.user.role)) return { status: 403, error: 'Acesso negado.' };
+  return auth;
+}
 
-      if (!avatarUrl) {
-        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end('URL do avatar não fornecida');
-        return;
-      }
-
-      const parsedAvatarUrl = new URL(avatarUrl);
-
-      // Permite somente imagens hospedadas pelo Google
-      const allowedHosts = [
-        'lh3.googleusercontent.com',
-        'lh4.googleusercontent.com',
-        'lh5.googleusercontent.com',
-        'lh6.googleusercontent.com'
-      ];
-
-      if (
-        parsedAvatarUrl.protocol !== 'https:' ||
-        !allowedHosts.includes(parsedAvatarUrl.hostname)
-      ) {
-        res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end('Fonte de avatar não permitida');
-        return;
-      }
-
-      const response = await fetch(parsedAvatarUrl.href);
-
-      if (!response.ok) {
-        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end('Avatar não encontrado');
-        return;
-      }
-
-      const contentType = response.headers.get('content-type') || 'image/jpeg';
-
-      if (!contentType.startsWith('image/')) {
-        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end('Arquivo de avatar inválido');
-        return;
-      }
-
-      const imageBuffer = Buffer.from(await response.arrayBuffer());
-
-      res.writeHead(200, {
-        'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=86400'
-      });
-
-      res.end(imageBuffer);
-      return;
-
-    } catch (error) {
-      console.error('Erro ao carregar avatar do Google:', error);
-
-      res.writeHead(500, {
-        'Content-Type': 'text/plain; charset=utf-8'
-      });
-
-      res.end('Erro ao carregar avatar');
-      return;
-    }
-  }
-
+async function routeRequest(req, res, pathname, method, payload = {}) {
   const json = (statusCode, data) => {
     res.writeHead(statusCode, {
       'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
+      'Cache-Control': 'no-store',
+      ...(data.token ? { 'Set-Cookie': sessionCookie(req, data.token) } : {}),
+      ...(pathname === '/api/auth/logout' ? { 'Set-Cookie': sessionCookie(req, '') } : {}),
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Session-Token',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
     });
@@ -298,6 +227,28 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
   }
 
   const db = await Database.get();
+
+  // Garante a estrutura mínima do banco antes de qualquer rota.
+  // Isso evita erros quando uma base antiga não possui alguma coleção.
+  if (!db.users || typeof db.users !== 'object' || Array.isArray(db.users)) db.users = {};
+  if (!db.sessions || typeof db.sessions !== 'object' || Array.isArray(db.sessions)) db.sessions = {};
+
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return json(400, { error: 'Corpo inválido.' });
+  if (method !== 'GET' && req.headers?.origin) {
+    try { if (new URL(req.headers.origin).host !== req.headers.host) return json(403, { error: 'Origem não autorizada.' }); }
+    catch { return json(403, { error: 'Origem inválida.' }); }
+  }
+  if (pathname.startsWith('/api/admin') || pathname.startsWith('/api/auth/')) {
+    const token = extractToken(req, payload);
+    const session = token && db.sessions[token];
+    const identity = session?.userId || req.socket?.remoteAddress || 'anonymous';
+    const key = crypto.createHash('sha256').update(identity + (pathname.startsWith('/api/admin') ? ':admin' : ':auth')).digest('hex');
+    db.rateLimits ||= {};
+    for (const [k, entry] of Object.entries(db.rateLimits)) if (entry.until <= Date.now()) delete db.rateLimits[k];
+    const limit = db.rateLimits[key] ||= { count: 0, until: Date.now() + 60000 };
+    if (++limit.count > (session ? 120 : 30)) { await Database.save(db); return json(429, { error: 'Muitas tentativas. Aguarde um minuto.' }); }
+    await Database.save(db);
+  }
 
   // 1. Status / Health
   if (pathname === '/api/health' && method === 'GET') {
@@ -332,9 +283,10 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
 
     const salt = crypto.randomBytes(16).toString('hex');
     const passwordHash = hashPassword(password, salt);
-    const userId = 'u_' + crypto.randomUUID().slice(0, 8);
+    const userId = 'u_' + crypto.randomUUID();
 
-    const isFounder = (key === FOUNDER_EMAIL || email === FOUNDER_EMAIL);
+    if (key === FOUNDER_EMAIL || email === FOUNDER_EMAIL) return json(403, { error: 'A conta fundadora exige identidade verificada. Utilize Google ou a conta configurada no servidor.' });
+    const isFounder = false;
 
     const newUser = {
       id: userId,
@@ -357,12 +309,13 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
 
     // Gera token de sessão
     const sessionToken = crypto.randomBytes(32).toString('hex');
-    await Database.save(db);
-    await Database.createSession(sessionToken, {
+    db.sessions[sessionToken] = {
       userId: newUser.id,
       username: key,
       createdAt: Date.now()
-    });
+    };
+
+    await Database.save(db);
 
     return json(201, {
       success: true,
@@ -384,25 +337,26 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
     const key = rawUsername.toLowerCase();
     const user = db.users[key];
 
-    if (!user || !verifyPassword(password, user.salt, user.passwordHash)) {
+    if (!user || !user.salt || !user.passwordHash || !verifyPassword(password, user.salt, user.passwordHash)) {
       return json(401, { error: 'Usuário ou senha incorretos.' });
     }
 
     ensureFounderRole(user);
 
     if (user.isBanned || user.role === 'banned') {
-      return json(403, { 
-        error: `Sua conta foi banida. Motivo: ${user.banReason || 'Violação das diretrizes do jogo.'}` 
+      return json(403, {
+        error: `Sua conta foi banida. Motivo: ${user.banReason || 'Violação das diretrizes do jogo.'}`
       });
     }
 
     const sessionToken = crypto.randomBytes(32).toString('hex');
-    await Database.save(db);
-    await Database.createSession(sessionToken, {
+    db.sessions[sessionToken] = {
       userId: user.id,
       username: key,
       createdAt: Date.now()
-    });
+    };
+
+    await Database.save(db);
 
     return json(200, {
       success: true,
@@ -424,10 +378,10 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
       gPayload = await verifyGoogleIdToken(token);
     } catch (err) {
       console.warn('Falha na validação do Google ID Token:', err.message);
-      return json(401, { error: 'Token do Google inválido ou expirado: ' + err.message });
+      return json(401, { error: 'Token do Google inválido ou expirado.' });
     }
 
-    if (!gPayload || !gPayload.sub) {
+    if (!gPayload || !gPayload.sub || gPayload.email_verified !== true) {
       return json(401, { error: 'Dados do Google inválidos (sub ausente).' });
     }
 
@@ -436,29 +390,42 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
     const googleName = String(gPayload.name || gPayload.given_name || '').trim();
     const googleAvatar = gPayload.picture || '⚡';
 
-    // 1. Identificar usuário pelo Google sub (ID único do Google)
-    let user = Object.values(db.users).find(u => u.googleId === googleSub);
+    // 1. Identificar usuário pelo Google sub (ID único do Google).
+    // O filtro ignora entradas inválidas para não quebrar um login novo.
+    let user = Object.values(db.users).find(
+      u => u && String(u.googleId || '') === googleSub
+    );
 
-    // 2. Se não encontrou por googleId, verificar se já existe conta pelo email para vincular
+    // 2. Se não encontrou por googleId, verificar se já existe conta pelo email para vincular.
     if (!user && googleEmail) {
-      user = Object.values(db.users).find(u => u.email && u.email.toLowerCase() === googleEmail);
-      if (user) {
-        user.googleId = googleSub;
-        if (googleAvatar && googleAvatar.startsWith('http')) {
-    user.avatar = googleAvatar;
+      const existing = Object.values(db.users).find(
+        u => u && typeof u.email === 'string' && u.email.toLowerCase() === googleEmail
+      );
+
+      if (existing) {
+        const auth = requireAuth(req, {}, db);
+        if (auth.error || auth.user.id !== existing.id) {
+          return json(409, { error: 'Entre na conta existente antes de vincular o Google.' });
         }
-      }
-      if (googleAvatar && googleAvatar.startsWith('http')) {
-    user.avatar = googleAvatar;
+        if (existing.googleId && existing.googleId !== googleSub) {
+          return json(409, { error: 'Conta já vinculada a outro Google.' });
+        }
+        user = existing;
+        user.googleId = googleSub;
       }
     }
 
-    // 3. Se ainda não existir, criar a conta automaticamente
+    // 3. Se ainda não existir, criar a conta automaticamente.
     if (!user) {
-      const userId = 'u_g_' + crypto.randomUUID().slice(0, 8);
-      let baseUsername = (gPayload.given_name || googleName || (googleEmail ? googleEmail.split('@')[0] : ''))
+      const userId = 'u_g_' + crypto.randomUUID();
+      let baseUsername = (
+        gPayload.given_name ||
+        googleName ||
+        (googleEmail ? googleEmail.split('@')[0] : '')
+      )
         .replace(/[^a-zA-Z0-9_-]/g, '')
         .slice(0, 12);
+
       if (!baseUsername || baseUsername.length < 3) {
         baseUsername = 'player';
       }
@@ -470,18 +437,19 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
         counter++;
       }
 
-      const isFounder = (googleEmail === FOUNDER_EMAIL);
-
       user = {
         id: userId,
         googleId: googleSub,
+        needsProfile: true,
         email: googleEmail,
         username: candidateKey,
         displayName: cleanString(googleName, 16) || candidateKey,
-        avatar: googleAvatar,
-        role: isFounder ? 'founder' : 'user',
+        avatar: typeof googleAvatar === 'string' && /^https:\/\//.test(googleAvatar)
+          ? googleAvatar
+          : '⚡',
+        role: 'user',
         isBanned: false,
-        balance: 1000, // Saldo inicial concedido uma única vez
+        balance: 1000,
         highestWin: 0,
         score: 1000,
         createdAt: Date.now(),
@@ -490,33 +458,50 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
 
       db.users[candidateKey] = user;
     } else {
-      // Usuário existente:
-      // NÃO resetar saldo, NÃO criar 2ª conta, manter highestWin e score
+      // Usuário existente: não resetar saldo, ganhos ou score.
       ensureFounderRole(user);
-      if (googleEmail === FOUNDER_EMAIL) {
-        user.role = 'founder';
-        user.isBanned = false;
-      }
       user.updatedAt = Date.now();
-      if (googleName && (!user.displayName || user.displayName === user.username)) {
-        user.displayName = cleanString(googleName, 16);
-      }
+    }
+
+    // Proteção adicional: nunca tente escrever em avatar de um usuário inexistente.
+    if (!user || typeof user !== 'object') {
+      console.error('Falha no login Google: usuário não foi criado/localizado.', {
+        googleSub,
+        googleEmail
+      });
+      return json(500, { error: 'Não foi possível criar ou localizar sua conta.' });
     }
 
     if (user.isBanned || user.role === 'banned') {
-      return json(403, { 
-        error: `Sua conta foi banida. Motivo: ${user.banReason || 'Violação das regras do jogo.'}` 
+      return json(403, {
+        error: `Sua conta foi banida. Motivo: ${user.banReason || 'Violação das regras do jogo.'}`
       });
     }
 
+    // Atualiza o avatar somente depois de garantir que o objeto user existe.
+    if (typeof googleAvatar === 'string' && /^https:\/\//.test(googleAvatar)) {
+      user.avatar = googleAvatar;
+    } else if (!user.avatar) {
+      user.avatar = '⚡';
+    }
+    // Para domínio externo, Google só é autoridade quando há Workspace (hd).
+    if (!db.founderId && googleEmail === FOUNDER_EMAIL && gPayload.hd === 'raphaeldisanto.com.br') {
+      db.founderId = user.id;
+      const founderStore = founderContext.getStore();
+      if (founderStore) founderStore.founderId = user.id;
+      for (const [key, session] of Object.entries(db.sessions)) if (session.userId === user.id) delete db.sessions[key];
+    }
+    ensureFounderRole(user);
+
     // Gera token de sessão unificado (idêntico ao login por senha)
     const sessionToken = crypto.randomBytes(32).toString('hex');
-    await Database.save(db);
-    await Database.createSession(sessionToken, {
+    db.sessions[sessionToken] = {
       userId: user.id,
       username: user.username,
       createdAt: Date.now()
-    });
+    };
+
+    await Database.save(db);
 
     return json(200, {
       success: true,
@@ -527,38 +512,53 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
 
   // 4. VERIFICAÇÃO DE SESSÃO ATIVA (/api/auth/me)
   if (pathname === '/api/auth/me' && method === 'GET') {
-    const auth = await getAuthenticatedUser(req, payload, db);
+    const auth = getAuthenticatedUser(req, payload, db);
     if (!auth) {
       return json(401, { error: 'Sessão inválida ou expirada.' });
     }
 
     const { user, token } = auth;
     if (user.isBanned || user.role === 'banned') {
-      await Database.deleteSession(token);
+      delete db.sessions[token];
       await Database.save(db);
-      return json(403, { 
-        error: `Sua conta foi banida. Motivo: ${user.banReason || 'Violação das regras do jogo.'}` 
+      return json(403, {
+        error: `Sua conta foi banida. Motivo: ${user.banReason || 'Violação das regras do jogo.'}`
       });
     }
 
     return json(200, {
       success: true,
+      token,
       user: sanitizeUser(user)
     });
+  }
+
+  if (pathname === '/api/profile' && method === 'POST') {
+    const auth = requireAuth(req, payload, db);
+    if (auth.error) return json(auth.status, { error: auth.error });
+    if (Object.keys(payload).some(k => k !== 'displayName')) return json(400, { error: 'Somente o apelido pode ser alterado.' });
+    const displayName = cleanString(payload.displayName, 24);
+    if (typeof payload.displayName !== 'string' || displayName.length < 3 || payload.displayName.trim().length > 24) return json(400, { error: 'Escolha um apelido de 3 a 24 caracteres.' });
+    auth.user.displayName = displayName;
+    auth.user.needsProfile = false;
+    auth.user.updatedAt = Date.now();
+    await Database.save(db);
+    return json(200, { success: true, user: sanitizeUser(auth.user) });
   }
 
   // 5. LOGOUT (/api/auth/logout)
   if (pathname === '/api/auth/logout' && method === 'POST') {
     const token = extractToken(req, payload);
-    if (token) {
-      await Database.deleteSession(token);
+    if (token && db.sessions[token]) {
+      delete db.sessions[token];
+      await Database.save(db);
     }
     return json(200, { success: true });
   }
 
   // 6. GIRO AUTORITATIVO NO SERVIDOR (COM PERSISTÊNCIA REAL DE SCORE)
   if (pathname === '/api/spin' && method === 'POST') {
-    const auth = await getAuthenticatedUser(req, payload, db);
+    const auth = getAuthenticatedUser(req, payload, db);
     if (!auth) {
       return json(401, { error: 'Você precisa estar logado para jogar.' });
     }
@@ -569,8 +569,8 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
     }
 
     const betAmount = parseInt(payload.bet, 10);
-    if (isNaN(betAmount) || betAmount < 5) {
-      return json(400, { error: 'Valor de aposta inválido (mínimo 5 moedas).' });
+    if (isNaN(betAmount) || betAmount < 5 || betAmount > 1000) {
+      return json(400, { error: 'Valor de aposta inválido (mínimo 5, máximo 1.000).' });
     }
 
     if (user.balance < betAmount) {
@@ -617,7 +617,7 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
   // type "punishment" (500 moedas): só é permitido quando o saldo já chegou a zero.
   // type "voluntary" (1000 moedas): o jogador pode reiniciar o progresso quando quiser.
   if (pathname === '/api/reset' && method === 'POST') {
-    const auth = await getAuthenticatedUser(req, payload, db);
+    const auth = getAuthenticatedUser(req, payload, db);
     if (!auth) {
       return json(401, { error: 'Você precisa estar logado para resetar o saldo.' });
     }
@@ -651,29 +651,28 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
 
   // 7. RANKING GLOBAL 100% REAL (SEM BOTS)
   if (pathname === '/api/leaderboard' && method === 'GET') {
-    if (res && res.setHeader) {
-      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    }
-    const usersList = Object.values(db.users || {});
+    const usersList = Object.values(db.users || {}).filter(u => !u.isBanned && u.role !== 'banned');
 
+    // Converte apenas jogadores reais cadastrados
     const leaderboard = usersList.map(u => ({
-        id: u.id,
-        name: u.displayName || u.username,
-        avatar: u.avatar || '⚡',
-        balance: u.balance,
-        highestWin: u.highestWin,
-        score: u.score || u.balance
+      id: u.id,
+      name: u.displayName || u.username,
+      avatar: u.avatar || '⚡',
+      balance: u.balance,
+      highestWin: u.highestWin,
+      score: u.score || u.balance
     }));
 
+    // Ordenação estritamente por pontuação / saldo e melhor vitória
     leaderboard.sort((a, b) => {
-        if (b.balance !== a.balance) return b.balance - a.balance;
-        return (b.highestWin || 0) - (a.highestWin || 0);
+      if (b.balance !== a.balance) return b.balance - a.balance;
+      return b.highestWin - a.highestWin;
     });
 
     return json(200, {
-        success: true,
-        totalPlayers: leaderboard.length,
-        leaderboard: leaderboard.slice(0, 30)
+      success: true,
+      totalPlayers: leaderboard.length,
+      leaderboard: leaderboard.slice(0, 15)
     });
   }
 
@@ -685,22 +684,27 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
   }
 
   // 9. ROTAS ADMINISTRATIVAS PROTEGIDAS NO BACKEND (/api/admin/*)
-  if (pathname.startsWith('/api/admin/')) {
-    const auth = await getAuthenticatedUser(req, payload, db);
-    if (!auth) {
-      return json(401, { error: 'Acesso não autorizado: sessão inválida ou token ausente.' });
-    }
+  if (pathname === '/api/admin' || pathname.startsWith('/api/admin/')) {
+    const auth = requireAdmin(req, payload, db);
+    if (auth.error) return json(auth.status, { error: auth.error });
+    if (Object.hasOwn(payload, 'role')) return json(400, { error: 'Role não pode ser enviada nesta API.' });
 
     const { user: adminUser } = auth;
     if (adminUser.isBanned || adminUser.role === 'banned') {
       return json(403, { error: 'Acesso negado: sua conta foi banida.' });
     }
 
-    const isFounder = adminUser.role === 'founder' || isFounderUser(adminUser);
+    const isFounder = isFounderUser(adminUser);
     const isAdmin = isFounder || adminUser.role === 'admin';
 
     if (!isAdmin) {
       return json(403, { error: 'Acesso negado: privilégios administrativos insuficientes.' });
+    }
+
+    if (pathname === '/api/admin/page' && method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY' });
+      res.end(require('fs').readFileSync(require('path').join(__dirname, 'admin.html'), 'utf8'));
+      return;
     }
 
     // 9.1 Validação de Sessão Administrativa (/api/admin/check)
@@ -736,7 +740,8 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
 
     // 9.3 Listagem de Jogadores (/api/admin/users)
     if (pathname === '/api/admin/users' && method === 'GET') {
-      const search = cleanString(payload.search || req.headers['x-search'] || '', 50).toLowerCase();
+      const query = new URL(req.url || pathname, 'http://localhost').searchParams;
+      const search = cleanString(query.get('search') || payload.search || req.headers['x-search'] || '', 80).toLowerCase();
       let users = Object.values(db.users || {});
 
       if (search) {
@@ -767,14 +772,15 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
     // 9.4 Alterar Saldo de Jogador (/api/admin/users/balance)
     if (pathname === '/api/admin/users/balance' && method === 'POST') {
       const targetId = String(payload.targetId || '').trim();
-      const mode = payload.mode === 'set' ? 'set' : 'add';
-      const amount = parseInt(payload.amount, 10);
+      const mode = payload.mode;
+      const amount = payload.amount;
+      if (!['set', 'add'].includes(mode)) return json(400, { error: 'Operação inválida.' });
       const reason = cleanString(payload.reason, 120);
 
       if (!targetId) {
         return json(400, { error: 'Identificador do jogador não informado.' });
       }
-      if (isNaN(amount)) {
+      if (!Number.isSafeInteger(amount) || Math.abs(amount) > 100000000) {
         return json(400, { error: 'Valor de saldo inválido.' });
       }
       if (!reason || reason.length < 3) {
@@ -787,7 +793,7 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
       }
 
       // Proteção: Fundador não pode ter saldo alterado por outros administradores
-      if (isFounderUser(target) && !isFounder) {
+      if (isFounderUser(target)) {
         return json(403, { error: 'A conta fundadora é protegida e seu saldo não pode ser alterado por outros administradores.' });
       }
 
@@ -797,6 +803,7 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
       }
 
       const prevBalance = target.balance || 0;
+      if (payload.expectedBalance !== undefined && payload.expectedBalance !== prevBalance) return json(409, { error: 'Saldo mudou. Atualize os jogadores e confirme novamente.' });
       let newBalance = mode === 'set' ? amount : prevBalance + amount;
 
       if (newBalance < 0) {
@@ -813,13 +820,13 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
       // Registro de Auditoria Obrigatório
       if (!db.admin_logs) db.admin_logs = [];
       const logEntry = {
-        id: 'log_' + crypto.randomUUID().slice(0, 8),
+        id: 'log_' + crypto.randomUUID(),
         adminId: adminUser.id,
         adminEmail: adminUser.email || adminUser.username,
         adminUsername: adminUser.displayName || adminUser.username,
         action: 'balance_change',
         targetUserId: target.id,
-        targetUsername: target.displayName || target.username,
+        targetUsername: target.username,
         saldoAnterior: prevBalance,
         saldoNovo: newBalance,
         diferenca: newBalance - prevBalance,
@@ -861,14 +868,15 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
 
       // Não banir a si próprio
       if (target.id === adminUser.id) {
-        return json(400, { error: 'Você não pode banir a sua própria conta.' });
+        return json(403, { error: 'Você não pode banir a sua própria conta.' });
       }
 
       // Apenas o Fundador pode banir outro administrador
-      if (target.role === 'admin' && !isFounder) {
+      if ((target.role === 'admin' || target.roleBeforeBan === 'admin') && !isFounder) {
         return json(403, { error: 'Apenas o Fundador possui permissão para banir administradores.' });
       }
 
+      target.roleBeforeBan = target.roleBeforeBan || target.role;
       target.isBanned = true;
       target.role = 'banned';
       target.banReason = reason;
@@ -876,18 +884,22 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
       target.updatedAt = Date.now();
 
       // Invalidação imediata de todas as sessões ativas do usuário banido
-      await Database.deleteSessionsForUser(target.id, target.username);
+      for (const [sToken, sData] of Object.entries(db.sessions || {})) {
+        if (sData.username === target.username || sData.userId === target.id) {
+          delete db.sessions[sToken];
+        }
+      }
 
       // Registro de Auditoria
       if (!db.admin_logs) db.admin_logs = [];
       db.admin_logs.unshift({
-        id: 'log_' + crypto.randomUUID().slice(0, 8),
+        id: 'log_' + crypto.randomUUID(),
         adminId: adminUser.id,
         adminEmail: adminUser.email || adminUser.username,
         adminUsername: adminUser.displayName || adminUser.username,
         action: 'user_banned',
         targetUserId: target.id,
-        targetUsername: target.displayName || target.username,
+        targetUsername: target.username,
         motivo: reason,
         timestamp: Date.now()
       });
@@ -909,21 +921,24 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
         return json(404, { error: 'Jogador não encontrado.' });
       }
 
+      if (isFounderUser(target) || target.id === adminUser.id || (!isFounder && (target.role === 'admin' || target.roleBeforeBan === 'admin'))) return json(403, { error: 'Conta protegida.' });
+      if (!target.isBanned && target.role !== 'banned') return json(400, { error: 'Conta não está banida.' });
       target.isBanned = false;
       target.role = 'user';
+      delete target.roleBeforeBan;
       delete target.banReason;
       delete target.bannedAt;
       target.updatedAt = Date.now();
 
       if (!db.admin_logs) db.admin_logs = [];
       db.admin_logs.unshift({
-        id: 'log_' + crypto.randomUUID().slice(0, 8),
+        id: 'log_' + crypto.randomUUID(),
         adminId: adminUser.id,
         adminEmail: adminUser.email || adminUser.username,
         adminUsername: adminUser.displayName || adminUser.username,
         action: 'user_unbanned',
         targetUserId: target.id,
-        targetUsername: target.displayName || target.username,
+        targetUsername: target.username,
         motivo: 'Desbanimento administrativo',
         timestamp: Date.now()
       });
@@ -955,7 +970,7 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
         return json(400, { error: 'Você não pode excluir sua própria conta pelo painel.' });
       }
 
-      if (target.role === 'admin' && !isFounder) {
+      if ((target.role === 'admin' || target.roleBeforeBan === 'admin') && !isFounder) {
         return json(403, { error: 'Apenas o Fundador pode remover contas de administradores.' });
       }
 
@@ -964,18 +979,22 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
       }
 
       // Limpeza de sessões e dados do usuário
-      await Database.deleteSessionsForUser(target.id, target.username);
+      for (const [sToken, sData] of Object.entries(db.sessions || {})) {
+        if (sData.username === target.username || sData.userId === target.id) {
+          delete db.sessions[sToken];
+        }
+      }
       delete db.users[target.username];
 
       if (!db.admin_logs) db.admin_logs = [];
       db.admin_logs.unshift({
-        id: 'log_' + crypto.randomUUID().slice(0, 8),
+        id: 'log_' + crypto.randomUUID(),
         adminId: adminUser.id,
         adminEmail: adminUser.email || adminUser.username,
         adminUsername: adminUser.displayName || adminUser.username,
         action: 'user_deleted',
         targetUserId: target.id,
-        targetUsername: target.displayName || target.username,
+        targetUsername: target.username,
         motivo: cleanString(payload.reason || 'Remoção permanente de conta', 120),
         timestamp: Date.now()
       });
@@ -1005,7 +1024,7 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
       }
 
       if (isFounderUser(target)) {
-        return json(400, { error: 'Este usuário já é o Fundador.' });
+        return json(403, { error: 'Este usuário já é o Fundador.' });
       }
 
       target.role = 'admin';
@@ -1013,13 +1032,13 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
 
       if (!db.admin_logs) db.admin_logs = [];
       db.admin_logs.unshift({
-        id: 'log_' + crypto.randomUUID().slice(0, 8),
+        id: 'log_' + crypto.randomUUID(),
         adminId: adminUser.id,
         adminEmail: adminUser.email || adminUser.username,
         adminUsername: adminUser.displayName || adminUser.username,
         action: 'admin_promoted',
         targetUserId: target.id,
-        targetUsername: target.displayName || target.username,
+        targetUsername: target.username,
         motivo: 'Promovido a Administrador pelo Fundador',
         timestamp: Date.now()
       });
@@ -1049,18 +1068,19 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
         return json(403, { error: 'O Fundador não pode revogar seus próprios privilégios.' });
       }
 
+      if (target.isBanned || target.role !== 'admin') return json(400, { error: 'Conta não é um administrador ativo.' });
       target.role = 'user';
       target.updatedAt = Date.now();
 
       if (!db.admin_logs) db.admin_logs = [];
       db.admin_logs.unshift({
-        id: 'log_' + crypto.randomUUID().slice(0, 8),
+        id: 'log_' + crypto.randomUUID(),
         adminId: adminUser.id,
         adminEmail: adminUser.email || adminUser.username,
         adminUsername: adminUser.displayName || adminUser.username,
         action: 'admin_demoted',
         targetUserId: target.id,
-        targetUsername: target.displayName || target.username,
+        targetUsername: target.username,
         motivo: 'Privilégio de Administrador revogado pelo Fundador',
         timestamp: Date.now()
       });
@@ -1077,11 +1097,17 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
     // 9.10 Logs de Auditoria (/api/admin/logs)
     if (pathname === '/api/admin/logs' && method === 'GET') {
       const logs = db.admin_logs || [];
-      const filtered = isFounder ? logs : logs.filter(l => l.action !== 'admin_promoted' && l.action !== 'admin_demoted');
+      const filtered = isFounder ? logs : logs.filter(l => l.adminId === adminUser.id);
+      const before = new URL(req.url || pathname, 'http://localhost').searchParams.get('before');
+      const cursorIndex = before ? filtered.findIndex(l => l.id === before) : -1;
+      if (before && cursorIndex < 0) return json(400, { error: 'Página de logs inválida.' });
+      const start = cursorIndex + 1;
+      const page = filtered.slice(start, start + 100);
 
       return json(200, {
         success: true,
-        logs: filtered.slice(0, 100)
+        logs: page,
+        nextCursor: start + page.length < filtered.length ? page[page.length - 1].id : null
       });
     }
 
@@ -1091,7 +1117,37 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
   return json(404, { error: 'Rota não encontrada.' });
 }
 
-module.exports = {
-  handleApiRequest,
-  SYMBOLS
-};
+async function handleApiRequest(req, res, pathname, method, payload = {}) {
+  const result = await Database.transaction(async () => {
+    const db = await Database.get();
+    // Migração somente por ID definido pelo operador, nunca pelo navegador.
+    const configuredId = process.env.FOUNDER_USER_ID || require('./founder.json').userId;
+    if (!db.founderId && configuredId) {
+      const candidate = Object.values(db.users).find(u => u.id === configuredId);
+      if (!candidate && process.env.FOUNDER_USER_ID) throw new Error('FOUNDER_USER_ID inexistente');
+      if (candidate) {
+        db.founderId = candidate.id;
+        for (const [token, session] of Object.entries(db.sessions)) if (session.userId === candidate.id) delete db.sessions[token];
+        await Database.save(db);
+      }
+    }
+    return founderContext.run({ founderId: db.founderId }, async () => {
+      for (const user of Object.values(db.users)) {
+        const previous = user.role;
+        ensureFounderRole(user);
+        if (previous !== user.role) {
+          for (const [token, session] of Object.entries(db.sessions)) if (session.userId === user.id) delete db.sessions[token];
+          await Database.save(db);
+        }
+      }
+      const response = { status: 500, headers: {}, body: '' };
+      const buffered = { writeHead(status, headers) { response.status = status; response.headers = headers; }, end(body) { response.body = body; } };
+      await routeRequest(req, buffered, pathname, method, payload);
+      return response;
+    });
+  });
+  res.writeHead(result.status, result.headers);
+  res.end(result.body);
+}
+
+module.exports = { handleApiRequest, SYMBOLS };
