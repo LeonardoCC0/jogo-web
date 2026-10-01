@@ -1,12 +1,5 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "functions": {
-    "api/index.js": {
-      "includeFiles": "server/admin.html,server/data/db.json"
-    }
-  },
   "rewrites": [
     {
       "source": "/api/(.*)",
@@ -14,15 +7,7 @@
     },
     {
       "source": "/admin",
-      "destination": "/api/index.js"
-    },
-    {
-      "source": "/admin/",
-      "destination": "/api/index.js"
-    },
-    {
-      "source": "/admin.html",
-      "destination": "/api/index.js"
+      "destination": "/admin.html"
     }
   ]
 }
