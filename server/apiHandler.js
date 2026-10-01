@@ -368,9 +368,12 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
       user = Object.values(db.users).find(u => u.email && u.email.toLowerCase() === googleEmail);
       if (user) {
         user.googleId = googleSub;
-        if (!user.avatar || user.avatar === '⚡') {
-          user.avatar = googleAvatar;
+        if (googleAvatar && googleAvatar.startsWith('http')) {
+    user.avatar = googleAvatar;
         }
+      }
+      if (googleAvatar && googleAvatar.startsWith('http')) {
+    user.avatar = googleAvatar;
       }
     }
 
@@ -576,26 +579,24 @@ async function handleApiRequest(req, res, pathname, method, payload = {}) {
   if (pathname === '/api/leaderboard' && method === 'GET') {
     const usersList = Object.values(db.users || {});
 
-    // Converte apenas jogadores reais cadastrados
     const leaderboard = usersList.map(u => ({
-      id: u.id,
-      name: u.displayName || u.username,
-      avatar: u.avatar || '⚡',
-      balance: u.balance,
-      highestWin: u.highestWin,
-      score: u.score || u.balance
+        id: u.id,
+        name: u.displayName || u.username,
+        avatar: u.avatar || '⚡',
+        balance: u.balance,
+        highestWin: u.highestWin,
+        score: u.score || u.balance
     }));
 
-    // Ordenação estritamente por pontuação / saldo e melhor vitória
     leaderboard.sort((a, b) => {
-      if (b.balance !== a.balance) return b.balance - a.balance;
-      return b.highestWin - a.highestWin;
+        if (b.balance !== a.balance) return b.balance - a.balance;
+        return b.highestWin - a.highestWin;
     });
 
     return json(200, {
-      success: true,
-      totalPlayers: leaderboard.length,
-      leaderboard: leaderboard.slice(0, 15)
+        success: true,
+        totalPlayers: leaderboard.length,
+        leaderboard: leaderboard.slice(0, 15)
     });
   }
 
