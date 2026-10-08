@@ -60,7 +60,11 @@ const server = http.createServer((req, res) => {
   }
 
   // Servidor de Arquivos Estáticos (Frontend)
-  if (pathname !== '/' && pathname !== '/index.html' && !/^\/(css|js)\/[a-zA-Z0-9_-]+\.(css|js)$/.test(pathname)) {
+  const isAllowedStatic = pathname === '/' || pathname === '/index.html' ||
+    /^\/(css|js)\/[a-zA-Z0-9_-]+\.(css|js)$/.test(pathname) ||
+    /^\/assets\/[a-zA-Z0-9_\-./]+\.(png|jpg|jpeg|svg|ico|webp)$/.test(pathname);
+
+  if (!isAllowedStatic) {
     res.writeHead(404);
     res.end('Não encontrado');
     return;

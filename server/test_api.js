@@ -52,18 +52,26 @@ async function run() {
     eq((await call(route, user.token)).status, 403, 'normal user ' + route);
     eq((await call(route, admin.token)).status, 200, 'admin ' + route);
   }
-  for (const action of ['ban', 'unban', 'delete', 'balance']) {
+  for (const action of ['ban', 'unban', 'delete']) {
     const body = { targetId: founder.user.id, reason: 'test reason', amount: 50, mode: 'add', confirmUsername: founder.user.username };
     eq((await call('/api/admin/users/' + action, user.token, body)).status, 403, 'normal mutation denied');
     eq((await call('/api/admin/users/' + action, admin.token, body)).status, 403, 'founder protected from admin: ' + action);
     eq((await call('/api/admin/users/' + action, founder.token, body)).status, 403, 'founder immutable: ' + action);
   }
+  // Balance: user e admin não podem alterar o saldo do founder, mas o founder pode alterar seu próprio saldo
+  const balBody = { targetId: founder.user.id, reason: 'test reason', amount: 50, mode: 'add' };
+  eq((await call('/api/admin/users/balance', user.token, balBody)).status, 403, 'normal mutation denied for balance');
+  eq((await call('/api/admin/users/balance', admin.token, balBody)).status, 403, 'founder balance protected from admin');
+  eq((await call('/api/admin/users/balance', founder.token, balBody)).status, 200, 'founder can change own balance');
   for (const action of ['promote', 'demote']) {
     eq((await call('/api/admin/admins/' + action, admin.token, { targetId: user.user.id })).status, 403, 'only founder manages admins');
     eq((await call('/api/admin/admins/' + action, founder.token, { targetId: founder.user.id })).status, 403, 'founder role protected');
   }
   eq((await call('/api/admin/admins/promote', founder.token, { targetId: user.user.id, role: 'founder' })).status, 400, 'cannot create another founder');
-  for (const amount of ['5x', '1000', 1.5, null, 100000001, -100000001]) eq((await call('/api/admin/users/balance', admin.token, { targetId: target.user.id, amount, mode: 'set', reason: 'test' })).status, 400, 'strict balance ' + amount);
+  for (const amount of ['5x', '1000', 1.5, null, -100000001]) eq((await call('/api/admin/users/balance', admin.token, { targetId: target.user.id, amount, mode: 'set', reason: 'test' })).status, 400, 'strict balance ' + amount);
+  // Sem limite superior de saldo:
+  eq((await call('/api/admin/users/balance', admin.token, { targetId: target.user.id, amount: 100000001, mode: 'set', reason: 'unlimited balance test' })).status, 200, 'unlimited balance allowed');
+  await call('/api/admin/users/balance', admin.token, { targetId: target.user.id, amount: 1000, mode: 'set', reason: 'reset for next tests' });
   eq((await call('/api/admin/users/balance', admin.token, { targetId: admin.user.id, amount: 5, mode: 'add', reason: 'test' })).status, 403, 'no self credit');
   eq((await call('/api/admin/users/ban', admin.token, { targetId: admin.user.id, reason: 'test' })).status, 403, 'no self ban');
   eq((await call('/api/admin/users/balance', admin.token, { targetId: target.user.id, amount: -1, mode: 'set', reason: 'test' })).status, 400, 'negative balance rejected');
