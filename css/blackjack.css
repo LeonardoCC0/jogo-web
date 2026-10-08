@@ -1,0 +1,912 @@
+/**
+ * COSTA CASINO - BLACKJACK 21 VIP
+ * Estilos da Mesa Tradicional, Cartas 3D, Fichas de Luxo e Animações de Cassino
+ */
+
+/* ==========================================================================
+   CONTAINER DO BLACKJACK
+   ========================================================================== */
+.blackjack-container {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+}
+
+/* ==========================================================================
+   A MESA DE CASSINO (FELT TABLE & RAILS)
+   ========================================================================== */
+.bj-table {
+  position: relative;
+  width: 100%;
+  min-height: 620px;
+  border-radius: 200px 200px 40px 40px;
+  box-shadow: 
+    0 25px 60px rgba(0, 0, 0, 0.9),
+    0 0 0 14px #1a1714,
+    0 0 0 18px #0b0a09,
+    0 0 0 22px rgba(255, 255, 255, 0.05),
+    inset 0 15px 40px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 30px 40px 24px;
+  overflow: hidden;
+  transition: background 0.5s ease;
+  user-select: none;
+}
+
+/* Mesa Verde Esmeralda Tradicional (Padrão) */
+.bj-table.felt-green {
+  background: 
+    radial-gradient(ellipse at 50% 30%, rgba(26, 122, 70, 0.95) 0%, rgba(9, 66, 36, 0.98) 55%, #042413 100%),
+    repeating-linear-gradient(45deg, rgba(0,0,0,0.02) 0px, rgba(0,0,0,0.02) 2px, transparent 2px, transparent 4px);
+  border: 4px solid #d4af37;
+}
+
+/* Mesa Vermelha Costa Imperial */
+.bj-table.felt-red {
+  background: 
+    radial-gradient(ellipse at 50% 30%, rgba(184, 18, 32, 0.95) 0%, rgba(115, 8, 18, 0.98) 55%, #3d0207 100%),
+    repeating-linear-gradient(45deg, rgba(0,0,0,0.02) 0px, rgba(0,0,0,0.02) 2px, transparent 2px, transparent 4px);
+  border: 4px solid #ff1a2b;
+}
+
+/* Borda Almofadada de Couro (Rail) */
+.bj-table-rail {
+  position: absolute;
+  inset: -14px;
+  border-radius: 214px 214px 54px 54px;
+  pointer-events: none;
+  box-shadow: inset 0 2px 6px rgba(255, 255, 255, 0.15), inset 0 -4px 10px rgba(0, 0, 0, 0.8);
+  border: 2px solid rgba(0, 0, 0, 0.6);
+}
+
+/* Seletor de Feltro / Cor da Mesa */
+.bj-felt-switcher {
+  position: absolute;
+  top: 18px;
+  right: 28px;
+  display: flex;
+  gap: 6px;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  padding: 4px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.btn-felt-color {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 14px;
+  border: none;
+  background: transparent;
+  color: #cbd5e1;
+  font-family: var(--font-heading);
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-felt-color.active {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.felt-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+.felt-dot.green { background: #16a34a; }
+.felt-dot.red { background: #dc2626; }
+
+/* Inscrições da Mesa (Silk-screen Casino Felt) */
+.bj-table-markings {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.85;
+}
+
+.bj-felt-watermark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  margin-bottom: 8px;
+}
+
+.bj-watermark-logo {
+  height: 42px;
+  opacity: 0.6;
+  filter: drop-shadow(0 0 8px rgba(0,0,0,0.5));
+}
+
+.bj-watermark-title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 900;
+  letter-spacing: 4px;
+  color: rgba(255, 255, 255, 0.45);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+
+.bj-felt-rule-arc {
+  font-family: var(--font-heading);
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: #e2e8f0;
+  text-transform: uppercase;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  border-top: 2px solid rgba(255, 255, 255, 0.2);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  padding: 4px 28px;
+  margin-bottom: 6px;
+  border-radius: 4px;
+}
+
+.bj-felt-subrule {
+  font-family: var(--font-heading);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: rgba(255, 255, 255, 0.65);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+
+.bj-felt-insurance-arc {
+  font-family: var(--font-heading);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: rgba(255, 215, 0, 0.7);
+  margin-top: 8px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+
+/* ==========================================================================
+   SAPATO DE CARTAS (SHOE) E BANDEJA DE DESCARTE
+   ========================================================================== */
+.bj-shoe {
+  position: absolute;
+  top: 24px;
+  right: 28px;
+  width: 70px;
+  height: 90px;
+  background: linear-gradient(135deg, #1e293b, #0f172a);
+  border-radius: 8px;
+  border: 2px solid #334155;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.7), inset 0 2px 4px rgba(255, 255, 255, 0.2);
+  transform: rotate(-15deg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  z-index: 5;
+}
+
+.bj-shoe-label {
+  font-family: var(--font-heading);
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #94a3b8;
+  letter-spacing: 1px;
+}
+
+.bj-shoe-cards {
+  width: 44px;
+  height: 32px;
+  background: #ff1a2b;
+  border-radius: 3px;
+  border: 1px solid #ffffff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+}
+
+/* ==========================================================================
+   ÁREA DO DEALER E DO JOGADOR
+   ========================================================================== */
+.bj-dealer-area,
+.bj-player-area {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.bj-dealer-area {
+  margin-top: 8px;
+}
+
+.bj-player-area {
+  margin-top: auto;
+  margin-bottom: 8px;
+}
+
+/* Badges de Pontuação */
+.bj-score-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(10, 14, 24, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 4px 14px;
+  border-radius: 20px;
+  margin-bottom: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  font-family: var(--font-heading);
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #ffffff;
+  transition: all 0.25s ease;
+}
+
+.bj-score-val {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 1rem;
+  color: #ff1a2b;
+  text-shadow: 0 0 8px rgba(255, 26, 43, 0.6);
+}
+
+.bj-score-badge.blackjack {
+  border-color: #ffd700;
+  background: rgba(255, 215, 0, 0.15);
+  box-shadow: 0 0 16px rgba(255, 215, 0, 0.5);
+}
+.bj-score-badge.blackjack .bj-score-val {
+  color: #ffd700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+}
+
+.bj-score-badge.bust {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+}
+.bj-score-badge.bust .bj-score-val {
+  color: #ef4444;
+}
+
+/* Fileira de Cartas */
+.bj-cards-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: -24px;
+  min-height: 115px;
+  perspective: 1000px;
+  padding: 4px;
+}
+
+/* Mãos Divididas (Split) */
+.bj-split-hands-container {
+  display: flex;
+  gap: 40px;
+  justify-content: center;
+  width: 100%;
+}
+
+.bj-hand-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 16px;
+  transition: all 0.3s;
+}
+
+.bj-hand-box.active-hand {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 20px rgba(255, 26, 43, 0.35);
+  border: 1px solid rgba(255, 26, 43, 0.5);
+}
+
+/* ==========================================================================
+   DESIGN REALISTA DAS CARTAS DE BARALHO (FRENCH CASINO DECK)
+   ========================================================================== */
+.bj-card {
+  width: 76px;
+  height: 112px;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 
+    0 6px 18px rgba(0, 0, 0, 0.65),
+    0 1px 3px rgba(0, 0, 0, 0.3);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 5px 6px;
+  margin-left: -24px;
+  user-select: none;
+  transform-origin: center center;
+  animation: dealCardAnim 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.1) forwards;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.bj-card:first-child {
+  margin-left: 0;
+}
+
+.bj-card:hover {
+  transform: translateY(-8px) scale(1.04);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.8);
+  z-index: 20 !important;
+}
+
+@keyframes dealCardAnim {
+  0% {
+    opacity: 0;
+    transform: translateY(-80px) scale(0.6) rotate(15deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+}
+
+/* Cores dos Naipes */
+.bj-card.red {
+  color: #d3122a;
+}
+.bj-card.black {
+  color: #1a1a1a;
+}
+
+/* Cantos da Carta (Índice + Naipe) */
+.bj-card-corner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.bj-card-corner.top-left {
+  align-self: flex-start;
+}
+
+.bj-card-corner.bottom-right {
+  align-self: flex-end;
+  transform: rotate(180deg);
+}
+
+.bj-card-value {
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.bj-card-suit-mini {
+  font-size: 0.85rem;
+}
+
+/* Centro da Carta */
+.bj-card-center-suit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2.2rem;
+  opacity: 0.9;
+  line-height: 1;
+}
+
+/* Carta Oculta do Dealer (Face Down) */
+.bj-card.face-down {
+  background: 
+    radial-gradient(circle at 50% 50%, #b80c18 0%, #75040d 100%),
+    repeating-linear-gradient(45deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 3px, transparent 3px, transparent 6px);
+  border: 2px solid #ffffff;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.7);
+  padding: 4px;
+}
+
+.bj-card.face-down .card-back-pattern {
+  width: 100%;
+  height: 100%;
+  border: 1px dashed rgba(255, 255, 255, 0.5);
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.bj-card.face-down .card-back-logo {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: 1px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+/* Efeito de Virar a Carta (Flip Reveal) */
+.bj-card.flipping {
+  animation: flipCardAnim 0.45s ease forwards;
+}
+
+@keyframes flipCardAnim {
+  0% { transform: rotateY(0deg); }
+  50% { transform: rotateY(90deg); }
+  100% { transform: rotateY(0deg); }
+}
+
+/* ==========================================================================
+   CÍRCULO DE APOSTA (BETTING SPOT) & PILHAS DE FICHAS
+   ========================================================================== */
+.bj-betting-spot-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 6px;
+  margin-bottom: 10px;
+}
+
+.bj-betting-spot {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  border: 3px dashed rgba(255, 255, 255, 0.55);
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.25s ease;
+}
+
+.bj-betting-spot:hover {
+  border-color: #ffd700;
+  box-shadow: inset 0 0 25px rgba(255, 215, 0, 0.2), 0 0 15px rgba(255, 215, 0, 0.35);
+}
+
+.bj-betting-spot.has-bet {
+  border-style: solid;
+  border-color: #ff1a2b;
+  box-shadow: 0 0 20px rgba(255, 26, 43, 0.45);
+}
+
+.bj-spot-label {
+  font-family: var(--font-heading);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.7);
+  text-align: center;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.bj-spot-amount-badge {
+  position: absolute;
+  bottom: -10px;
+  background: #0b0f19;
+  border: 1px solid #ffd700;
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 900;
+  color: #ffd700;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.8);
+  white-space: nowrap;
+}
+
+/* Fichas Empilhadas dentro do Círculo */
+.bj-chips-stack {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ==========================================================================
+   FICHAS DE CASSINO 3D (CHIP RACK)
+   ========================================================================== */
+.bj-chip-rack-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(8, 10, 16, 0.85);
+  backdrop-filter: blur(12px);
+  padding: 10px 20px;
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+  flex-wrap: wrap;
+}
+
+.bj-chip {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  user-select: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 
+    0 6px 12px rgba(0, 0, 0, 0.7),
+    inset 0 2px 2px rgba(255, 255, 255, 0.4),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.6);
+}
+
+.bj-chip:hover:not(:disabled) {
+  transform: translateY(-6px) scale(1.08);
+  box-shadow: 0 12px 20px rgba(0, 0, 0, 0.85);
+}
+
+.bj-chip:active:not(:disabled) {
+  transform: translateY(2px) scale(0.96);
+}
+
+.bj-chip:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  filter: grayscale(0.8);
+}
+
+/* Borda tracejada externa de ficha de cassino */
+.bj-chip::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  border: 2px dashed rgba(255, 255, 255, 0.6);
+  pointer-events: none;
+}
+
+/* Centro da Ficha */
+.bj-chip-inner {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 900;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Denominações das Fichas */
+/* $5 - Vermelho Clássico */
+.chip-5 {
+  background: radial-gradient(circle, #e50914 0%, #99000a 100%);
+}
+.chip-5 .bj-chip-inner { color: #e50914; }
+
+/* $25 - Verde Esmeralda */
+.chip-25 {
+  background: radial-gradient(circle, #10b981 0%, #047857 100%);
+}
+.chip-25 .bj-chip-inner { color: #047857; }
+
+/* $50 - Laranja Tangerina */
+.chip-50 {
+  background: radial-gradient(circle, #f97316 0%, #c2410c 100%);
+}
+.chip-50 .bj-chip-inner { color: #c2410c; }
+
+/* $100 - Preto Carbono VIP */
+.chip-100 {
+  background: radial-gradient(circle, #334155 0%, #0f172a 100%);
+}
+.chip-100::before { border-color: #ffd700; }
+.chip-100 .bj-chip-inner { background: #ffd700; color: #0f172a; }
+
+/* $500 - Roxo High Roller */
+.chip-500 {
+  background: radial-gradient(circle, #a855f7 0%, #6b21a8 100%);
+}
+.chip-500 .bj-chip-inner { color: #6b21a8; }
+
+/* $1.000 - Dourado Royale */
+.chip-1000 {
+  background: radial-gradient(circle, #fbbf24 0%, #b45309 100%);
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.45);
+}
+.chip-1000::before { border-color: #ffffff; }
+.chip-1000 .bj-chip-inner { background: #ffffff; color: #b45309; }
+
+/* ==========================================================================
+   BARRA DE AÇÕES (DEAL, HIT, STAND, DOUBLE, SPLIT)
+   ========================================================================== */
+.bj-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+/* Botões Táticos de Blackjack */
+.btn-bj-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  min-width: 120px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
+}
+
+.btn-bj-action:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.15);
+}
+
+.btn-bj-action:active:not(:disabled) {
+  transform: translateY(2px);
+}
+
+.btn-bj-action:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  filter: grayscale(0.8);
+  transform: none !important;
+}
+
+/* Botão DAR CARTAS (Deal) */
+.btn-bj-deal {
+  background: linear-gradient(135deg, #ff2a3b 0%, #b80c18 100%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  box-shadow: 0 0 20px rgba(255, 26, 43, 0.5);
+  font-size: 1.05rem;
+  padding: 14px 34px;
+}
+.btn-bj-deal:hover:not(:disabled) {
+  box-shadow: 0 0 30px rgba(255, 26, 43, 0.8);
+}
+
+/* Botão PEDIR CARTA (Hit) */
+.btn-bj-hit {
+  background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.35);
+}
+
+/* Botão PARAR (Stand) */
+.btn-bj-stand {
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.35);
+}
+
+/* Botão DOBRAR (Double) */
+.btn-bj-double {
+  background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.35);
+}
+
+/* Botão DIVIDIR (Split) */
+.btn-bj-split {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.35);
+}
+
+/* Botão SEGURO (Insurance) */
+.btn-bj-insurance {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.35);
+}
+
+/* Botões Auxiliares de Aposta (Limpar, Dobrar, Reapostar, All-in) */
+.bj-bet-modifiers-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.btn-bj-util {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-sm);
+  color: #cbd5e1;
+  font-family: var(--font-heading);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-bj-util:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.btn-bj-util:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   BANNER DE RESULTADO DO ROUND
+   ========================================================================== */
+.bj-result-overlay {
+  position: absolute;
+  top: 48%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 100;
+  padding: 16px 36px;
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.9);
+  text-align: center;
+}
+
+.bj-result-overlay.show {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+}
+
+.bj-result-overlay.win {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.95), rgba(4, 120, 87, 0.98));
+  border: 2px solid #34d399;
+  box-shadow: 0 0 35px rgba(16, 185, 129, 0.6);
+}
+
+.bj-result-overlay.blackjack {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.95), rgba(180, 83, 9, 0.98));
+  border: 2px solid #fbbf24;
+  box-shadow: 0 0 45px rgba(251, 191, 36, 0.8);
+}
+
+.bj-result-overlay.loss {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(185, 28, 28, 0.98));
+  border: 2px solid #f87171;
+  box-shadow: 0 0 35px rgba(239, 68, 68, 0.5);
+}
+
+.bj-result-overlay.push {
+  background: linear-gradient(135deg, rgba(71, 85, 105, 0.95), rgba(30, 41, 59, 0.98));
+  border: 2px solid #94a3b8;
+  box-shadow: 0 0 30px rgba(148, 163, 184, 0.4);
+}
+
+.bj-result-title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: 2px;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
+.bj-result-payout {
+  font-family: var(--font-heading);
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #ffd700;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}
+
+/* ==========================================================================
+   ESTATÍSTICAS DA SESSÃO DE BLACKJACK
+   ========================================================================== */
+.bj-session-stats-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  background: rgba(14, 18, 28, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  gap: 12px;
+  font-family: var(--font-heading);
+  font-size: 0.82rem;
+  color: #94a3b8;
+}
+
+.bj-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.bj-stat-item strong {
+  font-family: var(--font-display);
+  color: #ffffff;
+  font-size: 0.95rem;
+}
+
+/* Responsividade Mobile */
+@media (max-width: 768px) {
+  .bj-table {
+    border-radius: 120px 120px 24px 24px;
+    padding: 20px 14px 18px;
+    min-height: 520px;
+  }
+  .bj-felt-watermark {
+    display: none;
+  }
+  .bj-felt-rule-arc {
+    font-size: 0.82rem;
+    padding: 2px 12px;
+  }
+  .bj-card {
+    width: 58px;
+    height: 86px;
+    margin-left: -20px;
+    padding: 4px;
+  }
+  .bj-card-value {
+    font-size: 0.9rem;
+  }
+  .bj-card-center-suit {
+    font-size: 1.6rem;
+  }
+  .bj-chip {
+    width: 44px;
+    height: 44px;
+  }
+  .bj-chip-inner {
+    width: 28px;
+    height: 28px;
+    font-size: 0.7rem;
+  }
+  .btn-bj-action {
+    padding: 10px 16px;
+    min-width: 95px;
+    font-size: 0.82rem;
+  }
+}

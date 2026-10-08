@@ -1121,6 +1121,44 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
     });
   }
 
+  // 6.7 ALTERAÇÃO DIRETA DE SALDO PELO FUNDADOR (/api/user/founder-balance)
+  if (pathname === '/api/user/founder-balance' && method === 'POST') {
+    const auth = getAuthenticatedUser(req, payload, db);
+    if (!auth) return json(401, { error: 'Você precisa estar logado.' });
+    const { user } = auth;
+    const isFounder = isFounderUser(user) || user.role === 'founder';
+    if (!isFounder) {
+      return json(403, { error: 'Apenas a conta fundadora pode alterar seu próprio saldo diretamente.' });
+    }
+    const amount = Number(payload.amount);
+    if (!Number.isSafeInteger(amount) || amount < 0) {
+      return json(400, { error: 'Valor de saldo inválido.' });
+    }
+    const prevBalance = user.balance || 0;
+    user.balance = amount;
+    user.score = amount;
+    user.updatedAt = Date.now();
+
+    if (!db.admin_logs) db.admin_logs = [];
+    db.admin_logs.unshift({
+      id: 'log_' + crypto.randomUUID(),
+      adminId: user.id,
+      adminEmail: user.email || user.username,
+      adminUsername: user.displayName || user.username,
+      action: 'balance_change',
+      targetUserId: user.id,
+      targetUsername: user.username,
+      saldoAnterior: prevBalance,
+      saldoNovo: amount,
+      diferenca: amount - prevBalance,
+      motivo: cleanString(payload.reason || 'Ajuste direto do Fundador', 120),
+      timestamp: Date.now()
+    });
+
+    await Database.save(db);
+    return json(200, { success: true, balance: user.balance, user: sanitizeUser(user) });
+  }
+
   // 7. RANKING GLOBAL 100% REAL (SEM BOTS)
   if (pathname === '/api/leaderboard' && method === 'GET') {
     const usersList = Object.values(db.users || {}).filter(u => !u.isBanned && u.role !== 'banned');

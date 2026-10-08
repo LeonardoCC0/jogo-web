@@ -126,9 +126,12 @@
   gap: 12px;
 }
 
-.admin-logo .logo-emoji {
-  font-size: 2rem;
-  filter: drop-shadow(0 0 10px var(--neon-cyan));
+.admin-logo .logo-emoji,
+.admin-logo-img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 10px rgba(255, 26, 43, 0.45));
 }
 
 .admin-logo .logo-title {
@@ -250,6 +253,19 @@
   border-color: #ff1744;
   color: #ff5252;
   box-shadow: 0 0 12px rgba(255, 23, 68, 0.3);
+}
+
+.btn-founder-bal {
+  background: linear-gradient(135deg, rgba(255, 26, 43, 0.25) 0%, rgba(184, 12, 24, 0.35) 100%) !important;
+  border-color: #ff1a2b !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 12px rgba(255, 26, 43, 0.35) !important;
+}
+
+.btn-founder-bal:hover {
+  background: linear-gradient(135deg, rgba(255, 26, 43, 0.45) 0%, rgba(184, 12, 24, 0.6) 100%) !important;
+  box-shadow: 0 0 18px rgba(255, 26, 43, 0.6) !important;
+  transform: translateY(-1px);
 }
 
 /* ==========================================================================

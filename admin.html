@@ -2,8 +2,9 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>CYBER SLOTS • Painel Administrativo</title>
+  <title>COSTA SLOTS • Painel Administrativo</title>
   <meta name="description" content="Painel administrativo e central do fundador do Cyber Neon Slots.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -34,9 +35,9 @@
     <header class="admin-header">
       <div class="header-left">
         <div class="admin-logo">
-          <span class="logo-emoji">⚡</span>
+          <img src="assets/logo.png" alt="Costa Slots" class="admin-logo-img">
           <div class="logo-text">
-            <span class="logo-title" id="admin-header-title">CYBER SLOTS // ADMIN</span>
+            <span class="logo-title" id="admin-header-title">COSTA SLOTS // ADMIN</span>
             <span class="logo-subtitle" id="admin-header-subtitle">PAINEL DE CONTROLE</span>
           </div>
         </div>
@@ -57,6 +58,10 @@
             <span class="admin-email" id="current-admin-email">...</span>
           </div>
         </div>
+        <button id="btn-quick-founder-balance" class="btn-top-nav btn-founder-bal hidden" title="Ajustar Meu Saldo de Fundador (Sem Limite)">
+          <span>👑</span>
+          <span class="nav-label">Meu Saldo</span>
+        </button>
         <a href="/" class="btn-top-nav" title="Voltar ao Jogo">
           <span>🎮</span>
           <span class="nav-label">Jogo</span>
@@ -290,6 +295,7 @@
             <h2 class="section-title">Logs de Auditoria Administrativa</h2>
             <p class="section-desc">Histórico completo e imutável de todas as intervenções executadas no sistema.</p>
           </div>
+          <button id="btn-more-logs" class="btn-row-action hidden" type="button">Carregar mais logs</button>
           <button id="btn-refresh-logs" class="btn-icon-refresh" title="Atualizar Histórico">
             <span>🔄</span> Atualizar
           </button>
@@ -383,13 +389,15 @@
 
         <div class="form-group">
           <label for="bal-input-amount" id="bal-label-amount">Valor a Adicionar:</label>
-          <input type="number" id="bal-input-amount" min="1" max="100000000" placeholder="Ex: 5000" value="1000">
+          <input type="number" id="bal-input-amount" min="0" placeholder="Ex: 5000, 1000000 (Sem Limite)" value="1000">
           <div class="amount-quick-chips">
             <button type="button" class="quick-chip" data-val="500">+500</button>
             <button type="button" class="quick-chip" data-val="1000">+1.000</button>
             <button type="button" class="quick-chip" data-val="5000">+5.000</button>
             <button type="button" class="quick-chip" data-val="10000">+10.000</button>
             <button type="button" class="quick-chip" data-val="50000">+50.000</button>
+            <button type="button" class="quick-chip" data-val="100000">+100.000</button>
+            <button type="button" class="quick-chip" data-val="1000000">+1.000.000</button>
           </div>
         </div>
 

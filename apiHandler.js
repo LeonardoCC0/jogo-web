@@ -125,6 +125,191 @@ function evaluateSpin(symbols, betAmount) {
   };
 }
 
+// =========================================================================
+// MOTOR DE BLACKJACK AUTORITATIVO (COSTA BLACKJACK 21)
+// =========================================================================
+const BJ_SUITS = ['♠', '♥', '♦', '♣'];
+const BJ_VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+
+function createBlackjackShoe(deckCount = 6) {
+  const shoe = [];
+  for (let d = 0; d < deckCount; d++) {
+    for (const suit of BJ_SUITS) {
+      for (const value of BJ_VALUES) {
+        shoe.push({
+          suit,
+          value,
+          color: ['♥', '♦'].includes(suit) ? 'red' : 'black'
+        });
+      }
+    }
+  }
+  for (let i = shoe.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(0, i + 1);
+    [shoe[i], shoe[j]] = [shoe[j], shoe[i]];
+  }
+  return shoe;
+}
+
+function calculateHandValue(cards) {
+  if (!cards || !cards.length) return { total: 0, isSoft: false, isBust: false, isBlackjack: false };
+  let total = 0;
+  let aces = 0;
+  for (const card of cards) {
+    if (card.hidden) continue;
+    if (card.value === 'A') {
+      aces++;
+      total += 11;
+    } else if (['K', 'Q', 'J'].includes(card.value)) {
+      total += 10;
+    } else {
+      total += parseInt(card.value, 10);
+    }
+  }
+  while (total > 21 && aces > 0) {
+    total -= 10;
+    aces--;
+  }
+  return {
+    total,
+    isSoft: aces > 0,
+    isBust: total > 21,
+    isBlackjack: cards.length === 2 && total === 21
+  };
+}
+
+function drawBlackjackCard(db) {
+  if (!db.bj_shoe || !Array.isArray(db.bj_shoe) || db.bj_shoe.length < 15) {
+    db.bj_shoe = createBlackjackShoe(6);
+  }
+  return db.bj_shoe.pop();
+}
+
+function formatBlackjackState(session, revealDealer = false) {
+  const dealerCards = session.dealerCards.map((c, idx) => {
+    if (idx === 1 && !revealDealer) return { hidden: true, suit: '?', value: '?' };
+    return c;
+  });
+  const dealerValue = calculateHandValue(dealerCards);
+
+  const formattedHands = session.playerHands.map((h, idx) => {
+    const val = calculateHandValue(h.cards);
+    return {
+      cards: h.cards,
+      bet: h.bet,
+      doubled: !!h.doubled,
+      status: h.status,
+      value: val.total,
+      isSoft: val.isSoft,
+      isBust: val.isBust,
+      isBlackjack: val.isBlackjack,
+      isActive: session.status === 'playing' && session.activeHandIndex === idx,
+      result: h.result || null,
+      payout: h.payout || 0
+    };
+  });
+
+  const activeHand = session.playerHands[session.activeHandIndex] || session.playerHands[0];
+  const activeVal = calculateHandValue(activeHand ? activeHand.cards : []);
+
+  return {
+    id: session.id,
+    status: session.status,
+    activeHandIndex: session.activeHandIndex,
+    playerHands: formattedHands,
+    dealerCards,
+    dealerValue: dealerValue.total,
+    dealerIsSoft: dealerValue.isSoft,
+    dealerIsBust: dealerValue.isBust,
+    dealerIsBlackjack: dealerValue.isBlackjack,
+    canHit: session.status === 'playing' && !activeVal.isBust && activeVal.total < 21,
+    canStand: session.status === 'playing',
+    canDouble: session.status === 'playing' && activeHand && activeHand.cards.length === 2 && !activeHand.doubled,
+    canSplit: session.status === 'playing' && session.playerHands.length === 1 && activeHand && activeHand.cards.length === 2 && (activeHand.cards[0].value === activeHand.cards[1].value || (['10','J','Q','K'].includes(activeHand.cards[0].value) && ['10','J','Q','K'].includes(activeHand.cards[1].value))),
+    canInsurance: session.status === 'playing' && !session.insuranceBet && session.dealerCards[0] && session.dealerCards[0].value === 'A',
+    insuranceBet: session.insuranceBet || 0,
+    insuranceWon: session.insuranceWon || false,
+    insurancePayout: session.insurancePayout || 0,
+    totalPayout: session.totalPayout || 0,
+    message: session.message || ''
+  };
+}
+
+function resolveBlackjackDealer(session, db, user) {
+  let dVal = calculateHandValue(session.dealerCards);
+  const allBusted = session.playerHands.every(h => calculateHandValue(h.cards).isBust);
+  if (!allBusted) {
+    while (dVal.total < 17) {
+      session.dealerCards.push(drawBlackjackCard(db));
+      dVal = calculateHandValue(session.dealerCards);
+    }
+  }
+
+  session.status = 'resolved';
+  let totalPayout = 0;
+
+  if (session.insuranceBet > 0 && dVal.isBlackjack) {
+    const insWin = session.insuranceBet * 3;
+    totalPayout += insWin;
+    session.insuranceWon = true;
+    session.insurancePayout = insWin;
+  }
+
+  for (const hand of session.playerHands) {
+    const pVal = calculateHandValue(hand.cards);
+    if (pVal.isBust) {
+      hand.status = 'bust';
+      hand.result = 'bust';
+      hand.payout = 0;
+    } else if (dVal.isBust) {
+      hand.status = 'win';
+      hand.result = 'dealer_bust';
+      hand.payout = hand.bet * 2;
+      totalPayout += hand.payout;
+    } else if (pVal.total > dVal.total) {
+      hand.status = 'win';
+      hand.result = 'win';
+      hand.payout = hand.bet * 2;
+      totalPayout += hand.payout;
+    } else if (pVal.total === dVal.total) {
+      hand.status = 'push';
+      hand.result = 'push';
+      hand.payout = hand.bet;
+      totalPayout += hand.payout;
+    } else {
+      hand.status = 'loss';
+      hand.result = 'loss';
+      hand.payout = 0;
+    }
+  }
+
+  session.totalPayout = totalPayout;
+  if (totalPayout > 0) {
+    user.balance += totalPayout;
+    if (totalPayout > user.highestWin) user.highestWin = totalPayout;
+  }
+  user.score = user.balance;
+  user.updatedAt = Date.now();
+
+  const wins = session.playerHands.filter(h => ['win', 'dealer_bust'].includes(h.result)).length;
+  const pushes = session.playerHands.filter(h => h.result === 'push').length;
+
+  if (dVal.isBust) {
+    session.message = `Dealer estourou com ${dVal.total}! Você venceu!`;
+  } else if (wins > 0 && pushes === 0 && session.playerHands.length === 1) {
+    session.message = `Vitória! ${calculateHandValue(session.playerHands[0].cards).total} vs ${dVal.total} do dealer.`;
+  } else if (pushes > 0 && wins === 0) {
+    session.message = `Empate (Push)! Moedas devolvidas.`;
+  } else if (wins > 0) {
+    session.message = `Fim da rodada com lucro!`;
+  } else {
+    session.message = `Dealer vence com ${dVal.total}. Boa sorte na próxima!`;
+  }
+
+  if (db.bj_sessions) delete db.bj_sessions[user.id];
+}
+
+
 function extractToken(req, payload) {
   const authHeader = req.headers && (req.headers['authorization'] || req.headers['Authorization']);
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -481,7 +666,7 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
       });
     }
 
-    user.avatar = googleAvatar;
+    if (user.avatarSource !== 'upload') user.avatar = googleAvatar;
 
     // Para domínio externo, Google só é autoridade quando há Workspace (hd).
     if (!db.founderId && googleEmail === FOUNDER_EMAIL && gPayload.hd === 'raphaeldisanto.com.br') {
@@ -535,9 +720,20 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
   if (pathname === '/api/profile' && method === 'POST') {
     const auth = requireAuth(req, payload, db);
     if (auth.error) return json(auth.status, { error: auth.error });
-    if (Object.keys(payload).some(k => k !== 'displayName')) return json(400, { error: 'Somente o apelido pode ser alterado.' });
+    if (Object.keys(payload).some(k => !['displayName', 'avatar'].includes(k))) return json(400, { error: 'Somente o apelido e a foto podem ser alterados.' });
     const displayName = cleanString(payload.displayName, 24);
     if (typeof payload.displayName !== 'string' || displayName.length < 3 || payload.displayName.trim().length > 24) return json(400, { error: 'Escolha um apelido de 3 a 24 caracteres.' });
+    if (Object.hasOwn(payload, 'avatar')) {
+      if (typeof payload.avatar !== 'string' || payload.avatar.length > 120000 || !/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(payload.avatar)) {
+        return json(400, { error: 'Foto inválida ou muito grande. Escolha outro arquivo.' });
+      }
+      const photo = Buffer.from(payload.avatar.split(',')[1], 'base64');
+      if (photo.length < 4 || photo[0] !== 0xff || photo[1] !== 0xd8 || photo[2] !== 0xff || photo[photo.length - 2] !== 0xff || photo[photo.length - 1] !== 0xd9) {
+        return json(400, { error: 'Formato de foto inválido.' });
+      }
+      auth.user.avatar = payload.avatar;
+      auth.user.avatarSource = 'upload';
+    }
     auth.user.displayName = displayName;
     auth.user.needsProfile = false;
     auth.user.updatedAt = Date.now();
@@ -567,9 +763,9 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
       return json(403, { error: 'Sua conta está banida e não pode realizar apostas.' });
     }
 
-    const betAmount = parseInt(payload.bet, 10);
-    if (isNaN(betAmount) || betAmount < 5 || betAmount > 1000) {
-      return json(400, { error: 'Valor de aposta inválido (mínimo 5, máximo 1.000).' });
+    const betAmount = payload.bet;
+    if (!Number.isSafeInteger(betAmount) || betAmount < 5) {
+      return json(400, { error: 'Valor de aposta inválido (mínimo 5 moedas).' });
     }
 
     if (user.balance < betAmount) {
@@ -612,6 +808,283 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
     });
   }
 
+  // =========================================================================
+  // 6.2 ROTAS AUTORITATIVAS DE BLACKJACK (COSTA BLACKJACK 21)
+  // =========================================================================
+  if (pathname === '/api/blackjack/state' && method === 'GET') {
+    const auth = getAuthenticatedUser(req, payload, db);
+    if (!auth) return json(401, { error: 'Você precisa estar logado.' });
+    const { user } = auth;
+    const session = db.bj_sessions ? db.bj_sessions[user.id] : null;
+    if (!session) return json(200, { active: false, balance: user.balance });
+    return json(200, { active: true, balance: user.balance, round: formatBlackjackState(session, session.status === 'resolved') });
+  }
+
+  if (pathname === '/api/blackjack/deal' && method === 'POST') {
+    const auth = getAuthenticatedUser(req, payload, db);
+    if (!auth) return json(401, { error: 'Você precisa estar logado para jogar.' });
+    const { user } = auth;
+    if (user.isBanned || user.role === 'banned') return json(403, { error: 'Sua conta está banida.' });
+
+    const betAmount = payload.bet;
+    if (!Number.isSafeInteger(betAmount) || betAmount < 5) return json(400, { error: 'Aposta mínima de 5 moedas.' });
+    if (user.balance < betAmount) return json(400, { error: 'Saldo insuficiente para esta aposta.' });
+
+    if (db.bj_sessions && db.bj_sessions[user.id] && db.bj_sessions[user.id].status === 'playing') {
+      return json(400, { error: 'Já existe uma rodada em andamento.', round: formatBlackjackState(db.bj_sessions[user.id], false) });
+    }
+
+    user.balance -= betAmount;
+
+    const c1 = drawBlackjackCard(db);
+    const d1 = drawBlackjackCard(db);
+    const c2 = drawBlackjackCard(db);
+    const d2 = drawBlackjackCard(db);
+
+    const playerHand = {
+      cards: [c1, c2],
+      bet: betAmount,
+      doubled: false,
+      status: 'playing',
+      result: null,
+      payout: 0
+    };
+
+    const session = {
+      id: 'bj_' + crypto.randomUUID(),
+      userId: user.id,
+      playerHands: [playerHand],
+      dealerCards: [d1, d2],
+      activeHandIndex: 0,
+      status: 'playing',
+      insuranceBet: 0,
+      insuranceWon: false,
+      insurancePayout: 0,
+      totalPayout: 0,
+      message: ''
+    };
+
+    const pVal = calculateHandValue(playerHand.cards);
+    const dVal = calculateHandValue(session.dealerCards);
+
+    if (pVal.isBlackjack || dVal.isBlackjack) {
+      session.status = 'resolved';
+      let totalPayout = 0;
+      if (pVal.isBlackjack && dVal.isBlackjack) {
+        playerHand.status = 'push';
+        playerHand.result = 'push';
+        playerHand.payout = betAmount;
+        totalPayout = betAmount;
+        session.message = 'Blackjack mútuo! Empate (Push).';
+      } else if (pVal.isBlackjack) {
+        playerHand.status = 'blackjack';
+        playerHand.result = 'blackjack';
+        const win = betAmount + Math.round(betAmount * 1.5);
+        playerHand.payout = win;
+        totalPayout = win;
+        session.message = '👑 NATURAL BLACKJACK! Pagamento 3:2!';
+      } else {
+        playerHand.status = 'loss';
+        playerHand.result = 'loss';
+        playerHand.payout = 0;
+        session.message = 'Dealer possui Blackjack natural!';
+      }
+
+      session.totalPayout = totalPayout;
+      if (totalPayout > 0) {
+        user.balance += totalPayout;
+        if (totalPayout > user.highestWin) user.highestWin = totalPayout;
+      }
+      user.score = user.balance;
+      user.updatedAt = Date.now();
+      if (db.bj_sessions) delete db.bj_sessions[user.id];
+    } else {
+      db.bj_sessions ||= {};
+      db.bj_sessions[user.id] = session;
+    }
+
+    if (typeof db.total_spins !== 'number') db.total_spins = 0;
+    db.total_spins += 1;
+
+    await Database.save(db);
+
+    return json(200, {
+      success: true,
+      balance: user.balance,
+      round: formatBlackjackState(session, session.status === 'resolved')
+    });
+  }
+
+  if (pathname === '/api/blackjack/hit' && method === 'POST') {
+    const auth = getAuthenticatedUser(req, payload, db);
+    if (!auth) return json(401, { error: 'Você precisa estar logado.' });
+    const { user } = auth;
+    const session = db.bj_sessions ? db.bj_sessions[user.id] : null;
+    if (!session || session.status !== 'playing') return json(400, { error: 'Nenhuma rodada ativa para pedir carta.' });
+
+    const activeHand = session.playerHands[session.activeHandIndex];
+    if (!activeHand || activeHand.status !== 'playing') return json(400, { error: 'Mão inativa.' });
+
+    const newCard = drawBlackjackCard(db);
+    activeHand.cards.push(newCard);
+
+    const val = calculateHandValue(activeHand.cards);
+    if (val.isBust) {
+      activeHand.status = 'bust';
+      activeHand.result = 'bust';
+      if (session.activeHandIndex < session.playerHands.length - 1) {
+        session.activeHandIndex++;
+      } else {
+        resolveBlackjackDealer(session, db, user);
+      }
+    } else if (val.total === 21) {
+      activeHand.status = 'stand';
+      if (session.activeHandIndex < session.playerHands.length - 1) {
+        session.activeHandIndex++;
+      } else {
+        resolveBlackjackDealer(session, db, user);
+      }
+    }
+
+    await Database.save(db);
+
+    return json(200, {
+      success: true,
+      balance: user.balance,
+      round: formatBlackjackState(session, session.status === 'resolved')
+    });
+  }
+
+  if (pathname === '/api/blackjack/stand' && method === 'POST') {
+    const auth = getAuthenticatedUser(req, payload, db);
+    if (!auth) return json(401, { error: 'Você precisa estar logado.' });
+    const { user } = auth;
+    const session = db.bj_sessions ? db.bj_sessions[user.id] : null;
+    if (!session || session.status !== 'playing') return json(400, { error: 'Nenhuma rodada ativa para parar.' });
+
+    const activeHand = session.playerHands[session.activeHandIndex];
+    if (activeHand) activeHand.status = 'stand';
+
+    if (session.activeHandIndex < session.playerHands.length - 1) {
+      session.activeHandIndex++;
+    } else {
+      resolveBlackjackDealer(session, db, user);
+    }
+
+    await Database.save(db);
+
+    return json(200, {
+      success: true,
+      balance: user.balance,
+      round: formatBlackjackState(session, session.status === 'resolved')
+    });
+  }
+
+  if (pathname === '/api/blackjack/double' && method === 'POST') {
+    const auth = getAuthenticatedUser(req, payload, db);
+    if (!auth) return json(401, { error: 'Você precisa estar logado.' });
+    const { user } = auth;
+    const session = db.bj_sessions ? db.bj_sessions[user.id] : null;
+    if (!session || session.status !== 'playing') return json(400, { error: 'Nenhuma rodada ativa para dobrar.' });
+
+    const activeHand = session.playerHands[session.activeHandIndex];
+    if (!activeHand || activeHand.cards.length !== 2 || activeHand.doubled) {
+      return json(400, { error: 'Não é permitido dobrar nesta mão.' });
+    }
+    if (user.balance < activeHand.bet) {
+      return json(400, { error: 'Saldo insuficiente para dobrar a aposta.' });
+    }
+
+    user.balance -= activeHand.bet;
+    activeHand.bet *= 2;
+    activeHand.doubled = true;
+
+    const newCard = drawBlackjackCard(db);
+    activeHand.cards.push(newCard);
+
+    const val = calculateHandValue(activeHand.cards);
+    activeHand.status = val.isBust ? 'bust' : 'stand';
+    if (val.isBust) activeHand.result = 'bust';
+
+    if (session.activeHandIndex < session.playerHands.length - 1) {
+      session.activeHandIndex++;
+    } else {
+      resolveBlackjackDealer(session, db, user);
+    }
+
+    await Database.save(db);
+
+    return json(200, {
+      success: true,
+      balance: user.balance,
+      round: formatBlackjackState(session, session.status === 'resolved')
+    });
+  }
+
+  if (pathname === '/api/blackjack/split' && method === 'POST') {
+    const auth = getAuthenticatedUser(req, payload, db);
+    if (!auth) return json(401, { error: 'Você precisa estar logado.' });
+    const { user } = auth;
+    const session = db.bj_sessions ? db.bj_sessions[user.id] : null;
+    if (!session || session.status !== 'playing') return json(400, { error: 'Nenhuma rodada ativa.' });
+
+    if (session.playerHands.length !== 1) return json(400, { error: 'Apenas uma divisão é permitida.' });
+    const hand = session.playerHands[0];
+    if (hand.cards.length !== 2) return json(400, { error: 'Apenas a mão inicial pode ser dividida.' });
+
+    const c1 = hand.cards[0];
+    const c2 = hand.cards[1];
+    const isPair = c1.value === c2.value || (['10','J','Q','K'].includes(c1.value) && ['10','J','Q','K'].includes(c2.value));
+    if (!isPair) return json(400, { error: 'Cartas não formam um par.' });
+    if (user.balance < hand.bet) return json(400, { error: 'Saldo insuficiente para dividir a aposta.' });
+
+    user.balance -= hand.bet;
+
+    const newCard1 = drawBlackjackCard(db);
+    const newCard2 = drawBlackjackCard(db);
+
+    const hand1 = { cards: [c1, newCard1], bet: hand.bet, doubled: false, status: 'playing', result: null, payout: 0 };
+    const hand2 = { cards: [c2, newCard2], bet: hand.bet, doubled: false, status: 'playing', result: null, payout: 0 };
+
+    session.playerHands = [hand1, hand2];
+    session.activeHandIndex = 0;
+
+    await Database.save(db);
+
+    return json(200, {
+      success: true,
+      balance: user.balance,
+      round: formatBlackjackState(session, false)
+    });
+  }
+
+  if (pathname === '/api/blackjack/insurance' && method === 'POST') {
+    const auth = getAuthenticatedUser(req, payload, db);
+    if (!auth) return json(401, { error: 'Você precisa estar logado.' });
+    const { user } = auth;
+    const session = db.bj_sessions ? db.bj_sessions[user.id] : null;
+    if (!session || session.status !== 'playing') return json(400, { error: 'Nenhuma rodada ativa.' });
+
+    if (session.insuranceBet > 0 || session.dealerCards[0].value !== 'A') {
+      return json(400, { error: 'Seguro indisponível.' });
+    }
+
+    const insCost = Math.floor(session.playerHands[0].bet / 2);
+    if (user.balance < insCost) return json(400, { error: 'Saldo insuficiente para seguro.' });
+
+    user.balance -= insCost;
+    session.insuranceBet = insCost;
+
+    await Database.save(db);
+
+    return json(200, {
+      success: true,
+      balance: user.balance,
+      round: formatBlackjackState(session, false)
+    });
+  }
+
+
   // 6.5 RESET DE SALDO
   // type "punishment" (500 moedas): só é permitido quando o saldo já chegou a zero.
   // type "voluntary" (1000 moedas): o jogador pode reiniciar o progresso quando quiser.
@@ -646,6 +1119,44 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
       success: true,
       balance: user.balance
     });
+  }
+
+  // 6.7 ALTERAÇÃO DIRETA DE SALDO PELO FUNDADOR (/api/user/founder-balance)
+  if (pathname === '/api/user/founder-balance' && method === 'POST') {
+    const auth = getAuthenticatedUser(req, payload, db);
+    if (!auth) return json(401, { error: 'Você precisa estar logado.' });
+    const { user } = auth;
+    const isFounder = isFounderUser(user) || user.role === 'founder';
+    if (!isFounder) {
+      return json(403, { error: 'Apenas a conta fundadora pode alterar seu próprio saldo diretamente.' });
+    }
+    const amount = Number(payload.amount);
+    if (!Number.isSafeInteger(amount) || amount < 0) {
+      return json(400, { error: 'Valor de saldo inválido.' });
+    }
+    const prevBalance = user.balance || 0;
+    user.balance = amount;
+    user.score = amount;
+    user.updatedAt = Date.now();
+
+    if (!db.admin_logs) db.admin_logs = [];
+    db.admin_logs.unshift({
+      id: 'log_' + crypto.randomUUID(),
+      adminId: user.id,
+      adminEmail: user.email || user.username,
+      adminUsername: user.displayName || user.username,
+      action: 'balance_change',
+      targetUserId: user.id,
+      targetUsername: user.username,
+      saldoAnterior: prevBalance,
+      saldoNovo: amount,
+      diferenca: amount - prevBalance,
+      motivo: cleanString(payload.reason || 'Ajuste direto do Fundador', 120),
+      timestamp: Date.now()
+    });
+
+    await Database.save(db);
+    return json(200, { success: true, balance: user.balance, user: sanitizeUser(user) });
   }
 
   // 7. RANKING GLOBAL 100% REAL (SEM BOTS)
@@ -779,7 +1290,7 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
       if (!targetId) {
         return json(400, { error: 'Identificador do jogador não informado.' });
       }
-      if (!Number.isSafeInteger(amount) || Math.abs(amount) > 100000000) {
+      if (!Number.isSafeInteger(amount) || amount < 0) {
         return json(400, { error: 'Valor de saldo inválido.' });
       }
       if (!reason || reason.length < 3) {
@@ -792,12 +1303,12 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
       }
 
       // Proteção: Fundador não pode ter saldo alterado por outros administradores
-      if (isFounderUser(target)) {
+      if (isFounderUser(target) && !isFounder) {
         return json(403, { error: 'A conta fundadora é protegida e seu saldo não pode ser alterado por outros administradores.' });
       }
 
-      // Proteção: Ninguém (incluindo o founder) pode alterar o próprio saldo via API admin
-      if (target.id === adminUser.id) {
+      // Proteção: Outros administradores (não fundador) não podem alterar o próprio saldo
+      if (target.id === adminUser.id && !isFounder) {
         return json(403, { error: 'Você não pode alterar o próprio saldo pela API administrativa.' });
       }
 
@@ -805,11 +1316,8 @@ async function routeRequest(req, res, pathname, method, payload = {}) {
       if (payload.expectedBalance !== undefined && payload.expectedBalance !== prevBalance) return json(409, { error: 'Saldo mudou. Atualize os jogadores e confirme novamente.' });
       let newBalance = mode === 'set' ? amount : prevBalance + amount;
 
-      if (newBalance < 0) {
-        return json(400, { error: 'O saldo resultante não pode ser negativo.' });
-      }
-      if (newBalance > 100000000) {
-        return json(400, { error: 'O saldo resultante não pode ultrapassar o limite seguro de 100.000.000 moedas.' });
+      if (newBalance < 0 || !Number.isSafeInteger(newBalance)) {
+        return json(400, { error: 'O saldo resultante é inválido.' });
       }
 
       target.balance = newBalance;

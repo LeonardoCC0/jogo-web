@@ -50,6 +50,7 @@
         currentAdminName: document.getElementById('current-admin-name'),
         currentAdminEmail: document.getElementById('current-admin-email'),
         btnAdminLogout: document.getElementById('btn-admin-logout'),
+        btnQuickFounderBalance: document.getElementById('btn-quick-founder-balance'),
 
         // Tabs
         tabBtns: document.querySelectorAll('.tab-btn'),
@@ -192,12 +193,16 @@
       if (this.dom.adminBadgeRole) {
         if (this.isFounder) {
           this.dom.adminBadgeRole.className = 'badge-role badge-role-founder';
-          if (this.dom.adminBadgeIcon) this.dom.adminBadgeIcon.textContent = '⚡';
-          if (this.dom.adminBadgeText) this.dom.adminBadgeText.textContent = 'FOUNDER';
-          if (this.dom.adminHeaderTitle) this.dom.adminHeaderTitle.textContent = 'CYBER SLOTS // FOUNDER';
-          if (this.dom.adminHeaderSubtitle) this.dom.adminHeaderSubtitle.textContent = 'CONTROLE TOTAL';
+          if (this.dom.adminHeaderTitle) this.dom.adminHeaderTitle.textContent = 'COSTA SLOTS // FUNDADOR';
+          if (this.dom.adminHeaderSubtitle) this.dom.adminHeaderSubtitle.textContent = 'CONTROLE TOTAL DO SISTEMA';
+          if (this.dom.btnQuickFounderBalance) this.dom.btnQuickFounderBalance.classList.remove('hidden');
         } else {
           this.dom.adminBadgeRole.className = 'badge-role badge-role-admin';
+          if (this.dom.adminBadgeIcon) this.dom.adminBadgeIcon.textContent = '⚙';
+          if (this.dom.adminBadgeText) this.dom.adminBadgeText.textContent = 'ADMINISTRADOR';
+          if (this.dom.adminHeaderTitle) this.dom.adminHeaderTitle.textContent = 'COSTA SLOTS // ADMIN';
+          if (this.dom.adminHeaderSubtitle) this.dom.adminHeaderSubtitle.textContent = 'PAINEL DE CONTROLE';
+          if (this.dom.btnQuickFounderBalance) this.dom.btnQuickFounderBalance.classList.add('hidden');
           if (this.dom.adminBadgeIcon) this.dom.adminBadgeIcon.textContent = '⚙';
           if (this.dom.adminBadgeText) this.dom.adminBadgeText.textContent = 'ADMINISTRADOR';
         }
@@ -229,6 +234,14 @@
       // Logout
       if (this.dom.btnAdminLogout) {
         this.dom.btnAdminLogout.addEventListener('click', () => this.handleLogout());
+      }
+
+      if (this.dom.btnQuickFounderBalance) {
+        this.dom.btnQuickFounderBalance.addEventListener('click', () => {
+          if (this.currentUser) {
+            this.openBalanceModal(this.currentUser.id, this.currentUser.displayName || this.currentUser.username);
+          }
+        });
       }
 
       // Refresh buttons
@@ -483,7 +496,16 @@
         // Ações
         let actions = '';
         if (isFounder) {
-          actions = `<span class="protected-tag">🛡 PROTEGIDO</span>`;
+          if (this.isFounder) {
+            actions = `
+              <div class="action-buttons-cell">
+                <button class="btn-row-action btn-bal" data-action="balance" data-id="${this.escapeHtml(u.id)}" data-name="${this.escapeHtml(u.displayName || u.username)}">🪙 Alterar Saldo</button>
+                <span class="badge-role-tag founder">👑 VOCÊ (FUNDADOR)</span>
+              </div>
+            `;
+          } else {
+            actions = `<span class="protected-tag">🛡 PROTEGIDO</span>`;
+          }
         } else {
           actions = `
             <div class="action-buttons-cell">
@@ -614,8 +636,8 @@
       const reason = (this.dom.balInputReason?.value || '').trim();
       const mode = this.dom.balInputTypeSet?.checked ? 'set' : 'add';
 
-      if (!Number.isSafeInteger(amount) || amount < 0 || amount > 100000000) {
-        this.showToast('Informe um valor válido.', 'error');
+      if (!Number.isSafeInteger(amount) || amount < 0) {
+        this.showToast('Informe um valor de saldo válido.', 'error');
         return;
       }
       if (!reason || reason.length < 3) {

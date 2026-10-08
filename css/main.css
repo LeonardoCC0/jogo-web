@@ -3,29 +3,39 @@
  */
 
 :root {
-  /* Cores Principais do Tema Cyber Neon */
-  --bg-dark: #080911;
-  --bg-darker: #040508;
-  --bg-surface: #0f1222;
-  --bg-surface-glass: rgba(18, 22, 38, 0.82);
-  --bg-surface-elevated: #161b30;
+  /* Identidade Visual Costa Slots - Vermelho Carmesim, Branco Puro e Carbono */
+  --brand-red: #ff1a2b;
+  --brand-red-bright: #ff3849;
+  --brand-red-dark: #b80c18;
+  --brand-red-glow: rgba(255, 26, 43, 0.45);
+  
+  --brand-white: #ffffff;
+  --brand-silver: #e2e8f0;
+  --brand-silver-glow: rgba(255, 255, 255, 0.35);
 
-  --neon-cyan: #00f0ff;
-  --neon-cyan-glow: rgba(0, 240, 255, 0.35);
-  --neon-pink: #ff007f;
-  --neon-pink-glow: rgba(255, 0, 127, 0.4);
+  --bg-dark: #08090d;
+  --bg-darker: #040406;
+  --bg-surface: #0e1118;
+  --bg-surface-glass: rgba(14, 17, 24, 0.88);
+  --bg-surface-elevated: #161922;
+
+  /* Aliases para compatibilidade */
+  --neon-cyan: #ff1a2b;
+  --neon-cyan-glow: rgba(255, 26, 43, 0.45);
+  --neon-pink: #ffffff;
+  --neon-pink-glow: rgba(255, 255, 255, 0.35);
   --neon-gold: #ffd700;
   --neon-gold-glow: rgba(255, 215, 0, 0.4);
-  --neon-green: #00ff88;
-  --neon-green-glow: rgba(0, 255, 136, 0.35);
+  --neon-green: #00e676;
+  --neon-green-glow: rgba(0, 230, 118, 0.35);
   --neon-purple: #9d4edd;
   
   --text-primary: #ffffff;
-  --text-secondary: #9aa3c2;
-  --text-muted: #5e6687;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
 
-  --border-glass: rgba(255, 255, 255, 0.08);
-  --border-neon-cyan: rgba(0, 240, 255, 0.3);
+  --border-glass: rgba(255, 255, 255, 0.09);
+  --border-neon-cyan: rgba(255, 26, 43, 0.35);
   --border-neon-gold: rgba(255, 215, 0, 0.35);
 
   --font-display: 'Orbitron', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -62,12 +72,12 @@ html, body {
 }
 
 body {
-  /* Fundo sutil com gradientes radiais em neon simulando ambiente de fliperama/cassino high-tech */
+  /* Fundo sutil Costa Casino com iluminação carmesim e carbono */
   background-image: 
-    radial-gradient(circle at 50% 10%, rgba(0, 240, 255, 0.07) 0%, transparent 45%),
-    radial-gradient(circle at 10% 40%, rgba(255, 0, 127, 0.06) 0%, transparent 40%),
-    radial-gradient(circle at 90% 70%, rgba(157, 78, 221, 0.08) 0%, transparent 45%),
-    linear-gradient(180deg, #070912 0%, #05060b 100%);
+    radial-gradient(circle at 50% 8%, rgba(255, 26, 43, 0.12) 0%, transparent 50%),
+    radial-gradient(circle at 10% 40%, rgba(255, 26, 43, 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 90% 70%, rgba(255, 255, 255, 0.03) 0%, transparent 45%),
+    linear-gradient(180deg, #090a0f 0%, #050608 100%);
   background-attachment: fixed;
   display: flex;
   flex-direction: column;
@@ -113,7 +123,21 @@ body {
 .logo-wrapper {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+}
+
+.brand-logo-img {
+  height: 48px;
+  width: 48px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 12px rgba(255, 26, 43, 0.45));
+  transition: transform 0.25s ease, filter 0.25s ease;
+  flex-shrink: 0;
+}
+
+.brand-logo-img:hover {
+  transform: scale(1.06);
+  filter: drop-shadow(0 0 18px rgba(255, 26, 43, 0.75));
 }
 
 .logo-icon {
@@ -138,20 +162,82 @@ body {
   font-weight: 900;
   letter-spacing: 1.5px;
   color: #fff;
-  text-shadow: 0 0 12px var(--neon-cyan);
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .game-logo span {
-  color: var(--neon-pink);
-  text-shadow: 0 0 14px var(--neon-pink);
+  color: var(--brand-red);
+  text-shadow: 0 0 14px var(--brand-red-glow);
 }
 
 .logo-sub {
   font-family: var(--font-heading);
   font-size: 0.68rem;
   font-weight: 700;
-  color: var(--neon-cyan);
+  color: var(--brand-red);
   letter-spacing: 2px;
+}
+
+/* -------------------------------------------------------------
+   LOBBY SWITCHER NAV (COSTA SLOTS VS COSTA BLACKJACK)
+------------------------------------------------------------- */
+.game-lobby-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(18, 22, 32, 0.85);
+  padding: 4px;
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.lobby-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid transparent;
+  background: transparent;
+  color: #94a3b8;
+  font-family: var(--font-heading);
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  position: relative;
+}
+
+.lobby-tab-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.lobby-tab-btn.active {
+  background: linear-gradient(135deg, rgba(255, 26, 43, 0.28) 0%, rgba(184, 12, 24, 0.45) 100%);
+  border-color: rgba(255, 26, 43, 0.6);
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(255, 26, 43, 0.4);
+}
+
+.lobby-tab-btn.active .lobby-icon {
+  filter: drop-shadow(0 0 8px #ff1a2b);
+}
+
+.lobby-badge {
+  font-size: 0.6rem;
+  font-weight: 800;
+  background: #ff1a2b;
+  color: #ffffff;
+  padding: 2px 6px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+  animation: pulseDot 2s infinite;
 }
 
 .disclaimer-badge {

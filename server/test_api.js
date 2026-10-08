@@ -63,6 +63,12 @@ async function run() {
   eq((await call('/api/admin/users/balance', user.token, balBody)).status, 403, 'normal mutation denied for balance');
   eq((await call('/api/admin/users/balance', admin.token, balBody)).status, 403, 'founder balance protected from admin');
   eq((await call('/api/admin/users/balance', founder.token, balBody)).status, 200, 'founder can change own balance');
+  // Alterao direta de saldo via /api/user/founder-balance:
+  eq((await call('/api/user/founder-balance', user.token, { amount: 5000 })).status, 403, 'user denied founder-balance');
+  eq((await call('/api/user/founder-balance', admin.token, { amount: 5000 })).status, 403, 'admin denied founder-balance');
+  const founderDirectBal = await call('/api/user/founder-balance', founder.token, { amount: 888888888 });
+  eq(founderDirectBal.status, 200, 'founder direct balance update allowed');
+  eq(founderDirectBal.data.balance, 888888888, 'founder balance changed directly without limits');
   for (const action of ['promote', 'demote']) {
     eq((await call('/api/admin/admins/' + action, admin.token, { targetId: user.user.id })).status, 403, 'only founder manages admins');
     eq((await call('/api/admin/admins/' + action, founder.token, { targetId: founder.user.id })).status, 403, 'founder role protected');
